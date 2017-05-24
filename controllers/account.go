@@ -129,7 +129,7 @@ func (this *account) FormHandler(action byte,w http.ResponseWriter, r *http.Requ
 			library.VALIDATION.Result["nick"] = lang.T("auth_nick_exist_allready")
 		}
 	}
-	var phone  = library.VALIDATION.IsValidText(false,"nick",true,10,16,`^\+[0-9]+$`,` a-z 0-9 - _ `,r)
+	var phone  = library.VALIDATION.IsValidText(false,"phone",true,10,16,`^\+[0-9]+$`,` a-z 0-9 - _ `,r)
 	if phone != ""  {
 		var account = model.AccountModel.GetByEmailByNickByPhoneByPassword("","", phone,"")
 		if account != nil {

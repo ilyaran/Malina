@@ -15,153 +15,69 @@ package entity
 import "database/sql"
 
 type Session struct {
-	Id         	string	`json:"id"`
-	Ip_address 	string	`json:"ip_address"`
-	Account_id 	int64	`json:"account_id"`
+	Id                 string		`json:"Id"`
+	Ip_address         string		`json:"ip_address"`
+	Account            *Account		`json:"account"`
 
-	Email      	string	`json:"email"`
-	Nick       	string	`json:"nick"`
+	Data                  string		`json:"data"`
+	Data1              string		`json:"data1"`
+	Data2              string		`json:"data2"`
+	Data3              string		`json:"data2"`
 
-	Data       	string	`json:"data"`
+	User_agent         string		`json:"user_agent"`
 
-	User_agent 	string	`json:"user_agent"`
-	Is_flash   	bool	`json:"is_flash"`
-	Position_id   	int64	`json:"position_id"`
-
-	Position_title  string	`json:"position_title"`
-
-	Permission_data  string	`json:"permission_data"`
-
-	Phone 		string  `json:"phone"`
-	Balance  	int64	`json:"balance"`
 }
 
-func (s *Session)GetId()string{return s.Id}
-func (s *Session)GetIp_address()string{return s.Ip_address}
-func (s *Session)GetData()string{return s.Data}
-func (s *Session)GetAccount_id()int64{return s.Account_id}
-func (s *Session)GetEmail()string{return s.Email}
-func (s *Session)GetNick()string{return s.Nick}
-func (s *Session)GetPermission()string{return s.Permission_data}
-func (s *Session)GetBalance()int64{return s.Balance}
-func (s *Session)GetPhone()string{return s.Phone}
+func (s *Session)SetId(id string) {s.Id = id}
 
-func (s *Session)SetData(data string){s.Data=data}
+func (s *Session)SetData(data string) {s.Data = data}
+func (s *Session)SetData1(data string) {s.Data1 = data}
+func (s *Session)SetData2(data string) {s.Data2 = data}
 
-func (s *Session) ExecWithId() []interface{} {
-	return []interface{}{
-		s.Id,
-		s.Ip_address,
-		s.Account_id,
 
-		s.Email,
-		s.Nick,
-		s.Phone,
+func (s *Session)GetId() string {return s.Id}
+func (s *Session)GetIp_address() string {return s.Ip_address}
 
-		s.Data,
-		s.User_agent,
-		s.Is_flash,
+func (s *Session)GetAccount() *Account {return s.Account}
 
-		s.Position_id,
-		s.Balance}
-}
-func NewSession(account *Account,id,ip_address string,data,user_agent string,is_flash bool)*Session{
-	return &Session{
-		Id:id,
-		Ip_address:ip_address,
-		Account_id:account.GetId(),
+func (s *Session)GetData() string {return s.Data}
+func (s *Session)GetData1() string {return s.Data1}
+func (s *Session)GetData2() string {return s.Data2}
+func (s *Session)GetUser_agent() string {return s.User_agent}
 
-		Email:account.GetEmail(),
-		Nick:account.GetNick(),
-		Data:data,
 
-		User_agent:user_agent,
-		Is_flash:is_flash,
-		Position_id:account.GetPosition().GetId(),
-		Phone:account.GetPhone(),
-		Balance:account.GetBalance(),
+func SessionScan(row *sql.Row, rows *sql.Rows) *Session {
+	s := &Session{}
+	var account_id int64
+	var err error
+	if row != nil {
+		err = row.Scan(&s.Id,&account_id,&s.Data)
 	}
-}
-func NewUnauthSession(id,ip_address string,data,user_agent string)*Session{
-	return &Session{
-		Id:id,
-		Ip_address:ip_address,
-		Data:data,
-		User_agent:user_agent}
-}
-func SessionScanRow(row *sql.Row)*Session{
-	var s = &Session{}
-	err := row.Scan(
-		&s.Id,
-		&s.Ip_address,
-		&s.Account_id,
-
-		&s.Email,
-		&s.Nick,
-		&s.Phone,
-
-		&s.Data,
-		&s.User_agent,
-		&s.Is_flash,
-
-		&s.Position_id,
-		&s.Balance,
-		&s.Position_title,
-		&s.Permission_data,
-
-		)
-
-	if err == sql.ErrNoRows {return nil}
-	if err != nil {
-		panic(err)
-		return nil
+	if row == nil {
+		err = rows.Scan(&s.Id,&account_id,&s.Data)
 	}
-	return s
-}
-func SessionScanRows(rows *sql.Rows)*Session{
-	var s = &Session{}
-	err := rows.Scan(
-		&s.Id,
-		&s.Ip_address,
-		&s.Account_id,
-
-		&s.Email,
-		&s.Nick,
-		&s.Phone,
-
-		&s.Data,
-		&s.User_agent,
-		&s.Is_flash,
-
-		&s.Position_id,
-		&s.Balance,
-		&s.Position_title,
-		&s.Permission_data,
-	)
 
 	if err == sql.ErrNoRows {
+		//panic(err)
 		return nil
 	}
 	if err != nil {
 		panic(err)
 		return nil
 	}
-
+	if account_id > 0 {
+		s.Account = &Account{Id: account_id}
+	}
 	return s
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+func NewSession(id,ip string,account *Account,data,userAgent string) *Session{
+	return &Session{
+		Id:id,
+		Ip_address:ip,
+		Account:account,
+		Data:data,
+		User_agent:userAgent,
+	}
+}

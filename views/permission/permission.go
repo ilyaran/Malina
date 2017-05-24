@@ -4,80 +4,41 @@ import (
 	"Malina/entity"
 	"Malina/language"
 	"strconv"
-	"Malina/config"
 	"Malina/views"
 	"Malina/libraries"
 )
 
+
+var select_options_order_by string = `
+	<option value="1">`+lang.T("ID")+`&uarr;</option>
+	<option value="2">`+lang.T("ID")+`&darr;</option>
+	<option value="3">`+lang.T("position")+`&uarr;</option>
+	<option value="4">`+lang.T("position")+`&darr;</option>
+	<option value="5">`+lang.T("data")+`&uarr;</option>
+	<option value="6">`+lang.T("data")+`&darr;</option>
+`
+var table_head = `
+	<th width="5%">ID</th>
+	<th width="5%">`+lang.T("position id")+`</th>
+	<th width="10%">`+lang.T("position title")+`</th>
+	<th >`+lang.T("data")+`</th>
+	<th width="20%">
+		<button id="submitInlistButton" class="btn btn-success"><span class="glyphicon glyphicon-save" aria-hidden="true"></span></button>
+		Delete<input type="checkbox"  onchange="if(this.checked){$('.inlist_del').prop('checked',true);}else{$('.inlist_del').prop('checked',false);}">
+	</th>
+	`
 func Index(permissionList []*entity.Permission, paging string)string{
-	var inputs = `
-	<input type="hidden" value="permission" id="dbtable"/>
-	<input type="hidden" value="`+app.No_image()+`" id="url_no_image"/>
-	<input type="hidden" value="`+app.Base_url()+app.Upload_path()+`" id="url_upload_path"/>
-	<input type="hidden" value="`+app.Base_url()+app.Uri_permission_ajax()+`" id="url_permission_list_ajax"/>
-	<input type="hidden" value="`+app.Base_url()+app.Uri_permission_get()+`" id="url_permission_get"/>
-	<input type="hidden" value="`+app.Base_url()+app.Uri_permission_add()+`" id="url_permission_add"/>
-	<input type="hidden" value="`+app.Base_url()+app.Uri_permission_edit()+`" id="url_permission_edit"/>
-	<input type="hidden" value="`+app.Base_url()+app.Uri_permission_del()+`" id="url_permission_del"/>`
-	var out = inputs + `
-<div class="row">
-	<div class="col-md-12">
+	views.TABLE_FORM.SetNull()
 
-		<div class="panel panel-default">
-			<div class="panel-heading">
-				<h3 class="panel-title">Home / Permissions</h3>
-			</div>
-		  	<div class="panel-body">
-		    		`+lang.T("per page")+`
-				`+views.FACE_FORM.PerPageSelectForm()+`
-				&nbsp;&nbsp;
-				<span>`+lang.T("order_by")+`</span>
-				<select id="order_by" >
-					<option value="1">`+lang.T("id")+`&uarr;</option>
-					<option value="2">`+lang.T("id")+`&darr;</option>
-				</select>
-				<input type="text" class="form-control" id="search" name="search"  placeholder="Search for...">
+	views.TABLE_FORM.Inputs = views.FACE_FORM.Inputs("permission")
+	views.TABLE_FORM.Breadcrumb = "Home / Permissions"
+	views.TABLE_FORM.Select_options_order_by = select_options_order_by
+	views.TABLE_FORM.Head = table_head
+	views.TABLE_FORM.Listing = Listing(permissionList,paging)
+	views.TABLE_FORM.Form = Form()
+	views.TABLE_FORM.IndexFrom()
 
-		    		<button id="get_list" class="btn btn-primary" type="button" >`+lang.T("go")+`</button>
-
-		  	</div>
-		</div>
-
-		<ul class="nav nav-tabs">
-                	<li class="active"><a href="#home" data-toggle="tab">`+lang.T("list")+`</a></li>
-                        <li class=""><a href="#form" data-toggle="tab">` + lang.T("form") + `</a></li>
-		</ul>
-		<div class="tab-content">
-			<div class="tab-pane fade active in" id="home">
-				<table class="table table-striped table-bordered table-hover" id="dataTables-example">
-					<thead>
-						<tr>
-							<th>ID</th>
-							<th>`+lang.T("role id")+`</th>
-							<th>`+lang.T("role title")+`</th>
-							<th>`+lang.T("data")+`</th>
-							<th></th>
-						</tr>
-
-					</thead>
-					<tbody id="listing">
-					`
-						out += Listing(permissionList,paging)+`
-
-					</tbody>
-				</table>
-			</div>
-			<div class="tab-pane fade" id="form">
-				`+Form()+`
-
-			</div>
-		</div>
-	</div>
-</div>
-
-`+ views.Footer()
-
-	return out
+	return views.TABLE_FORM.Out + views.Footer()
 }
 
 func Listing(permissionList []*entity.Permission, paging string)string{
@@ -90,11 +51,20 @@ func Listing(permissionList []*entity.Permission, paging string)string{
 				<td>` + idStr + `</td>
 				<td>` + strconv.FormatInt(i.GetPosition().GetId(),10) + `</td>
 				<td>` + i.GetPosition().GetTitle() + `</td>
-				<td>` + i.GetData()  + `</td>
-				<td>
-					<a data-item_id="` + idStr + `" class="btn btn-primary edit_item"><span class="glyphicon glyphicon-edit" aria-hidden="true"></span></a>
-					<a data-item_id="` + idStr + `" class="btn btn-danger del_item"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></a>
+				<td>`
+			if _,ok := library.SESSION.SessionObj.Account.Position.GetDescendantIdsMap()[i.GetPosition().GetId()];
+				ok || library.SESSION.SessionObj.Account.Position.GetParent().GetId() == 0 {
+				out+=`<input data-item_id="` + idStr + `" class="inlist_data" type="text" value="` + i.GetData() +`"/>
 				</td>
+				<td>
+					<button data-item_id="` + idStr + `" class="btn btn-primary edit_item"><span class="glyphicon glyphicon-edit" aria-hidden="true"></span></button>
+					<button data-item_id="` + idStr + `" class="btn btn-danger del_item"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></button>
+					<input value="0" data-item_id="` + idStr + `" class="inlist_del" type="checkbox">
+				</td>
+				`}else {
+				out += i.GetData()+`</td><td><td></td>`
+			}
+			out+=`
 			</tr>`
 		}
 		out += `
@@ -121,53 +91,32 @@ func Listing(permissionList []*entity.Permission, paging string)string{
 func Form()string{
 	out := `
 <div class="row">
-	<div class="col-md-12">
-		<div class="form-group">
-			<div id="error" class="error"></div>
-			<select id="action">
-				<option value="add">`+lang.T("add")+`</option>
-				<option value="get">`+lang.T("get")+`</option>
-				<option value="edit">`+lang.T("edit")+`</option>
-				<option value="delete">`+lang.T("delete")+`</option>
-			</select>
-                        <span style = "display:none;" id = "item_id_bar">
-                        	<span>`+lang.T("id")+`:</span>
-                        	<input id = "item_id" value="" type="integer"/>
-                        	<span id = "item_id_error" class="error"></span>
-                        </span>
-                        <button id = "success_bar" style="display:none;" type="button" class="btn btn-success btn-lg">Success</button>
-                </div>
-                <button id="submitButton" class="btn btn-primary">`+lang.T("Send")+`</button>
-
+	<div class="col-md-12">` +
+		views.FACE_FORM.BarForms() + `&nbsp;&nbsp;` +
+		`<span id="select_position">
+			<select id="position_id">
+                        	` + positionView.GetSelectOptionsListView(library.SESSION.SessionObj.Account.Position,false) +`
+                        </select>
+                        <span id="position_id_error"  class="error"></span>
+		</span>` +
+		`<br>
+		<button class="btn btn-primary submitButton">`+lang.T("Send")+`</button>
                 <table class="table table-striped table-bordered table-hover" >
                 	<tr>
                         	<td>
-                                	<label>`+lang.T("role")+`
-                                		<span id="position_id_error"  class="error"><span>
-                                	</label>
-                                </td>
-                                <td>
                                 	<div class="form-group">
-                                		<select id="position_id">
-                                			`+library.POSITION.SelectOptionsList +`
-                                		</select>
+                                            	<label>`+lang.T("data")+`
+						<span id="data_error"  class="error"></span></label>
                                         </div>
-                               	</td>
-                        </tr>
-                     	<tr>
-                        	<td>
-                                	<label>`+lang.T("data")+`<span class="error">*</span>
-                                		<span id="data_error"  class="error"><span>
-                                	</label>
                                 </td>
                                 <td>
                                 	<div class="form-group">
-                                        	<input id="data"  class="form-control" />
+                                		<textarea width="100%" id="data"></textarea>
                                 	</div>
                                	</td>
                         </tr>
-
                 </table>
+                <button class="btn btn-primary submitButton">`+lang.T("Send")+`</button>
         </div>
 </div>`
 	return out

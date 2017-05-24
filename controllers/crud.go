@@ -23,6 +23,7 @@ import (
 	"github.com/gorilla/mux"
 	"fmt"
 	"Malina/models"
+	"html/template"
 )
 
 /**
@@ -187,26 +188,17 @@ func (s *CrudController) inlistUpdateQuery(columnName, columnType string, r *htt
 				ids += `,` + id_value_arr[0]
 				valueNum++
 			case "string":
-				match, _ = regexp.MatchString(app.Pattern_title(), id_value_arr[1])
-				if match {
 					// building "$1,$2,$3,$4,$5 ..." string to values array: unnest(ARRAY[$1,$2,$3,$4,$5 ...]) AS v
 					values += `,$` + strconv.Itoa(valueNum)
-					exec = append(exec, id_value_arr[1])
+					exec = append(exec, template.HTMLEscapeString(id_value_arr[1]))
 					ids += `,` + id_value_arr[0]
 					valueNum++
-				}
+				
 			}
 		}
 	}
 	if ids != `` {
-		//fmt.Println(fmt.Sprintf(layout_item_query, values[1:], ids[1:]))
-		if model.Crud.Update(fmt.Sprintf(layout_item_query, values[1:], ids[1:]), exec) > 0 {
-			return
-		} else {
-			library.VALIDATION.Status = 200
-			library.VALIDATION.Result[columnName] = "not updated"
-			return
-		}
+		model.Crud.Update(fmt.Sprintf(layout_item_query, values[1:], ids[1:]), exec)
 	}
 }
 func (s *CrudController) inlistDeleteQuery(r *http.Request) {

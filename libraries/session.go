@@ -18,16 +18,16 @@ import (
 
 var SESSION *Session
 type Session struct {
-	sessionId  string
-	SessionObj *entity.Session
+	cookieString string
+	SessionObj   *entity.Session
 }
 func (s *Session)GetSessionObj() *entity.Session {
 	return s.SessionObj
 }
 func (s *Session) Authentication(w http.ResponseWriter, r *http.Request) {
-	s.sessionId = s.GetCookie(app.Cookie_name(),r)
-	if s.sessionId != "" {
-		s.SessionObj = model.Session.Get(s.sessionId, s.GetIP(r))
+	s.cookieString = s.GetCookie(app.Cookie_name(),r)
+	if s.cookieString != "" {
+		s.SessionObj = model.Session.Get(s.cookieString, s.GetIP(r))
 		if s.SessionObj != nil {
 			return
 		}

@@ -14,8 +14,9 @@ package views
 
 import (
 	"Malina/language"
-	"Malina/libraries"
+	"Malina/config"
 )
+
 
 var FACE_FORM *FaceForm = &FaceForm{}
 var TABLE_FORM *TableForm= &TableForm{}
@@ -99,6 +100,20 @@ func(s *TableForm) IndexFrom(){
 
 type FaceForm struct {}
 
+func (s *FaceForm)Inputs(dbtable string)string{
+	return `
+	<input type="hidden" value="`+dbtable+`" id="dbtable"/>
+	<input type="hidden" value="`+app.No_image()+`" id="url_no_image"/>
+	<input type="hidden" value="`+app.Base_url()+app.Upload_path()+`" id="url_upload_path"/>
+	<input type="hidden" value="`+app.Base_url()+`home/`+dbtable+`/list_ajax/" id="url_`+dbtable+`_list_ajax"/>
+	<input type="hidden" value="`+app.Base_url()+`home/`+dbtable+`/get/" id="url_`+dbtable+`_get"/>
+	<input type="hidden" value="`+app.Base_url()+`home/`+dbtable+`/add/" id="url_`+dbtable+`_add"/>
+	<input type="hidden" value="`+app.Base_url()+`home/`+dbtable+`/edit/" id="url_`+dbtable+`_edit"/>
+	<input type="hidden" value="`+app.Base_url()+`home/`+dbtable+`/del/" id="url_`+dbtable+`_del"/>
+
+	`
+}
+
 func (s *FaceForm)BarForms()string{
 	return `
 	<div class="form-group" style="float:left;">
@@ -122,8 +137,8 @@ func (s *FaceForm)CategorySelect(rootTile string,keyName string)string{
 		<span>`+lang.T(keyName)+`</span>
 		<select id="`+keyName+`" onchange="$('#`+keyName+`_title').html($('#`+keyName+` option:selected').text());">
 		`; if rootTile != ``{
-			out += `<option value="0">`+rootTile+`</option>`
-		}; out += library.CATEGORY.SelectOptionsList + `
+		out += `<option value="0">`+rootTile+`</option>`
+	}; out += /*library.CATEGORY.SelectOptionsList +*/ `
 		</select>
 		&nbsp;&nbsp;
 		<span id="`+keyName+`_error" class="error"></span>
@@ -205,19 +220,37 @@ func (s *FaceForm)Title()string{
         </tr>`
 }
 
-func (s *FaceForm)Enable(keyName string)string{
-	return 	`
+func (s *FaceForm)FormField(title, keyName string, isRequired bool)string{
+	o := `
+	<tr>
+        	<td>
+        		<label>`+lang.T(keyName); if isRequired {o+=`<span class="error">*</span>`}; o+= `
+                        	<span id="`+keyName+`_error"  class="error"><span>
+                        </label>
+		</td>
+                <td>
+                        <div class="form-group">
+                        	<input id="`+keyName+`"  class="form-control" />
+                        </div>
+                </td>
+        </tr>`
+	return o
+}
+
+func (s *FaceForm)CheckBox(title,keyName string,isChecked bool)string{
+	o := `
 	<tr>
 		<td>
                 	<div class="form-group">
-                        	<label>`+lang.T(keyName)+`</label>
+                        	<label>`+lang.T(title)+`</label>
 			</div>
                 </td>
                 <td>
                         <div class="form-group">
-                        	<input id="`+keyName+`" type="checkbox" checked class="form-control" />
+                        	<input id="`+keyName+`" type="checkbox" `;if isChecked {
+		o += `checked`}; o += ` class="form-control" />
                         </div>
                 </td>
-        </tr>
-	`
+        </tr>`
+	return o
 }
