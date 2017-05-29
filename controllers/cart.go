@@ -2,7 +2,7 @@
  * Cart controller class.  Malina eCommerce application
  *
  *
- * @author		John Aran (Ilyas Toxanbayev)
+ * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
  * @email      		il.aranov@gmail.com
@@ -14,16 +14,16 @@ package controller
 
 import (
 	"net/http"
-	"Malina/views/cart"
-	"Malina/helpers"
-	"Malina/models"
-	"Malina/config"
+	"github.com/ilyaran/Malina/views/cart"
+	"github.com/ilyaran/Malina/helpers"
+	"github.com/ilyaran/Malina/models"
+	"github.com/ilyaran/Malina/config"
 	"fmt"
 	"encoding/json"
-	"Malina/language"
-	"Malina/entity"
-	"Malina/views"
-	"Malina/libraries"
+	"github.com/ilyaran/Malina/language"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/views"
+	"github.com/ilyaran/Malina/libraries"
 	"strconv"
 )
 
@@ -34,22 +34,32 @@ type cartController  struct {
 }
 
 func (this *cartController) Index(w http.ResponseWriter, r *http.Request) {
-	action := this.crud.authAdmin("cart",w,r)
+	this.crud.hasPermission("cart","cart_id",w,r)
+	if library.VALIDATION.Status == 0 {
+		model.CartModel.Query = ``
+		model.CartModel.Where = ``
+		model.CartModel.All = 0
 
-	model.CartModel.Query = ``
-	model.CartModel.Where = ``
-	model.CartModel.All = 0
-
-	switch action {
-		case "ajax_list" : if this.AjaxList(w,r) {return}
-		case "get" 	 : if this.Get(w,r) {return}
-		case "add" 	 : this.FormHandler('a',w,r)
-		case "edit" 	 : this.FormHandler('e',w,r)
-		case "del" 	 : this.Del(w,r)
-		default		 : this.List(w,r); return // "list"
+		switch this.crud.action {
+		case "ajax_list":
+			if this.AjaxList(w, r) {
+				return
+			}
+		case "get":
+			if this.Get(w, r) {
+				return
+			}
+		case "add":
+			this.FormHandler('a', w, r)
+		case "edit":
+			this.FormHandler('e', w, r)
+		case "del":
+			this.Del(w, r)
+		default:
+			this.List(w, r); return // "list"
+		}
 	}
 	helper.SetAjaxHeaders(w)
-
 	out, _ := json.Marshal(library.VALIDATION)
 	fmt.Fprintf(w, string(out))
 }

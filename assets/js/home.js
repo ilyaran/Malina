@@ -2,7 +2,7 @@
  * Home JavaScripts.  Malina eCommerce application
  *
  *
- * @author		John Aran (Ilyas Toxanbayev)
+ * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
  * @email      		il.aranov@gmail.com
@@ -63,7 +63,7 @@ $(document).ready(function () {
         var uri = $("#url_" + dbtable + "_get").val();
         request(uri,"get",postData,"json","POST");
     });
-    $("#submitButton").click(function () {
+    $(".submitButton").click(function () {
         postData = {};
         var action = $("#action").val();
         if (action != "add") {
@@ -92,7 +92,10 @@ $(document).ready(function () {
             method: method,
             url: uri,
             data: postData,
-            dataType: type
+            dataType: type/*,
+            headers: {
+                'Cookie': document.cookie
+            }*/
         }).done(function (msg) {
             $("#loader").hide();
             //console.log(msg);
@@ -105,18 +108,20 @@ $(document).ready(function () {
                 }
             }
             if (action == "ajax_list") {
-                if(msg.match(/(unauth)/)){
+                /*if(msg.match(/(unauth)/)){
                     window.location.reload();
-                }
+                }*/
                 $("#listing").html(msg);
                 $("[data-toggle='toggle']").bootstrapToggle('destroy');
                 $("[data-toggle='toggle']").bootstrapToggle();
             }
             if (action == "inlist") {
+                getAjaxList(0);
                 if(msg.Status > 0){
-                    setErrors(msg);
+                    setErrors("inlist",msg);
                 }else {
                     ShowSuccess("");
+                    getAjaxList(0);
                 }
             }
             if (action == "add") {
@@ -177,11 +182,12 @@ $(document).ready(function () {
         }
     }
     function ShowSuccess(msg) {
+        $('.nav-tabs a[href="#home"]').tab('show');
         var success_bar = $("#success_bar");
-        if(msg != ""){
-            success_bar.html(msg);
-        }
+        if ( msg == "" ){msg = "Success!";}
+        success_bar.html(msg);
         success_bar.show(300);
+        //$("#home").tab('show');
     }
 
     function getPostData(isListing) {
@@ -202,14 +208,14 @@ $(document).ready(function () {
             if (dbtable == "account") {
                 postData.nick = $("#nick").val();
                 postData.email = $("#email").val();
-                if ($("#newpass").val() != "") {
-                    postData.newpass = $("#newpass").val();
-                }
+                postData.phone = $("#phone").val();
+                postData.newpass = $("#newpass").val();
                 postData.position = $('#position').val();
                 if ($('#ban').prop('checked')) {
                     postData.ban = 1;
-                    postData.ban_reason = $('#ban_reason').val();
                 }
+                postData.ban_reason = $('#ban_reason').val();
+
             }
             if (dbtable == "position") {
                  postData.parent = $("#parent").val();
@@ -261,6 +267,15 @@ $(document).ready(function () {
     $("#submitInlistButton").on("click", function () {
         postData = {};
         var fields = [];
+        if (dbtable == "permission") {
+            fields = ["permission_data","del"];
+        }
+        if (dbtable == "position") {
+            fields = ["position_title","position_sort","position_enable","del"];
+        }
+        if (dbtable == "account") {
+            fields = ["account_nick","account_ban","account_email","account_phone","account_newpass","del"];
+        }
         if (dbtable == "category") {
             fields = ["category_sort","category_title","category_enable","del"];
         }
@@ -286,13 +301,9 @@ $(document).ready(function () {
         if (dbtable == "account") {
             $("#nick").val(msg.nick);
             $("#email").val(msg.email);
-            $("#position").val(msg.position.id);
-            //$("#newpass").val(msg.newpass);
-            if(msg.banned == 0){
-                $('#ban').prop('checked', false);
-            }else {
-                $('#ban').prop('checked', true);
-            }
+            $("#phone").val(msg.phone);
+            $("#position").val(msg.position+0);
+            $('#ban').prop('checked', msg.ban);
             $("#ban_reason").val(msg.ban_reason);
         }
         if (dbtable == "position") {
@@ -322,7 +333,7 @@ $(document).ready(function () {
             $("#code").val(msg.code);
         }
         clean_image_preview();
-        if(msg.img.length > 0 ){
+        if(msg.img){
             $.each(msg.img, function (index, value) {
                 if (value!="") {
                     var image = new Image();

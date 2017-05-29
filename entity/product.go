@@ -15,7 +15,7 @@ package entity
 import (
 	"time"
 	"database/sql"
-	"Malina/config"
+	"github.com/ilyaran/Malina/config"
 	"encoding/json"
 	"strings"
 )
@@ -25,6 +25,7 @@ type Product struct {
 	category_id       int64
 	price             float64
 	price1            float64
+	quantity	  float64
 	code              string
 	title             string
 	description       string
@@ -149,6 +150,12 @@ func (this *Product)  Get_price() float64 {
 }
 func (this *Product)  Get_price1() float64 {
 	return this.price1
+}
+func (this *Product)  Get_quantity() float64 {
+	return this.quantity
+}
+func (this *Product)  Total() float64 {
+	return this.price * this.quantity
 }
 func (this *Product)  Get_code() string {
 	return this.code

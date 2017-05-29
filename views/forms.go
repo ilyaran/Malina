@@ -13,12 +13,13 @@
 package views
 
 import (
-	"Malina/language"
-	"Malina/config"
+	"github.com/ilyaran/Malina/language"
+	"github.com/ilyaran/Malina/config"
+	"github.com/ilyaran/Malina/libraries"
 )
 
 
-var FACE_FORM *FaceForm = &FaceForm{}
+var ICE_FORM *IceForm = &IceForm{}
 var TABLE_FORM *TableForm= &TableForm{}
 
 type TableForm struct {
@@ -43,7 +44,7 @@ func(s *TableForm) SetNull(){
 	s.Option1 = ``
 	s.Option2 = ``
 }
-func(s *TableForm) IndexFrom(){
+func(s *TableForm) BuildIndexForm(){
 	s.Out = s.Inputs + `
 	<div class="row">
 	<div class="col-md-12">
@@ -52,7 +53,7 @@ func(s *TableForm) IndexFrom(){
 				<h3 class="panel-title">`+s.Breadcrumb +`</h3>
 			</div>
 		  	<div class="panel-body">
-		    		`+FACE_FORM.PerPageSelectForm() + `
+		    		`+ ICE_FORM.PerPageSelectForm() + `
 				&nbsp;&nbsp;
 				<span>`+lang.T("order_by")+`</span>
 				<select id="order_by" >
@@ -98,9 +99,9 @@ func(s *TableForm) IndexFrom(){
 
 
 
-type FaceForm struct {}
+type IceForm struct {}
 
-func (s *FaceForm)Inputs(dbtable string)string{
+func (s *IceForm)Inputs(dbtable string)string{
 	return `
 	<input type="hidden" value="`+dbtable+`" id="dbtable"/>
 	<input type="hidden" value="`+app.No_image()+`" id="url_no_image"/>
@@ -114,7 +115,7 @@ func (s *FaceForm)Inputs(dbtable string)string{
 	`
 }
 
-func (s *FaceForm)BarForms()string{
+func (s *IceForm)BarForms()string{
 	return `
 	<div class="form-group" style="float:left;">
 		<select id="action">
@@ -131,24 +132,24 @@ func (s *FaceForm)BarForms()string{
         </div>
 	<span style="float:left;" id="error" class="error"></span>`
 }
-func (s *FaceForm)CategorySelect(rootTile string,keyName string)string{
+func (s *IceForm)CategorySelect(rootTile string,keyName string)string{
 	var out string
 	out += `&nbsp;&nbsp;
 		<span>`+lang.T(keyName)+`</span>
 		<select id="`+keyName+`" onchange="$('#`+keyName+`_title').html($('#`+keyName+` option:selected').text());">
 		`; if rootTile != ``{
 		out += `<option value="0">`+rootTile+`</option>`
-	}; out += /*library.CATEGORY.SelectOptionsList +*/ `
+	}; out += library.CATEGORY.BuildSelectOptionsView(nil,nil,-1) + `
 		</select>
 		&nbsp;&nbsp;
 		<span id="`+keyName+`_error" class="error"></span>
 		<span class="btn btn-info" id="`+keyName+`_title">Category Title</span>`
 	return out
 }
-func (s *FaceForm)PerPageSelectForm()string{
+func (s *IceForm)PerPageSelectForm()string{
 	return lang.T("per page") + `
 	<select name="per_page" id="per_page" >
-		<option value="100">100</option>
+		<option value="3">100</option>
 		<option value="150">150</option>
 		<option value="200">200</option>
 		<option value="300">300</option>
@@ -157,7 +158,7 @@ func (s *FaceForm)PerPageSelectForm()string{
 	</select>`
 }
 
-func (s *FaceForm)ImageBar()string{
+func (s *IceForm)ImageBar()string{
 	return `
 	<div id="roxyCustomPanel2" style="display: none;">
 		<iframe src="/assets/filemanager/index.html?integration=custom&type=files&txtFieldId=image_preview" style="width:100%;height:100%" frameborder="0">
@@ -171,7 +172,7 @@ func (s *FaceForm)ImageBar()string{
         <span id="img_error" class="error"></span>`
 }
 
-func (s *FaceForm)Description()string{
+func (s *IceForm)Description()string{
 	return `
 	<tr>
 		<td>
@@ -204,7 +205,7 @@ func (s *FaceForm)Description()string{
 				});
 			</script>
  */
-func (s *FaceForm)Title()string{
+func (s *IceForm)Title()string{
 	return `
 	<tr>
         	<td>
@@ -220,7 +221,7 @@ func (s *FaceForm)Title()string{
         </tr>`
 }
 
-func (s *FaceForm)FormField(title, keyName string, isRequired bool)string{
+func (s *IceForm)FormField(title, keyName string, isRequired bool)string{
 	o := `
 	<tr>
         	<td>
@@ -237,7 +238,7 @@ func (s *FaceForm)FormField(title, keyName string, isRequired bool)string{
 	return o
 }
 
-func (s *FaceForm)CheckBox(title,keyName string,isChecked bool)string{
+func (s *IceForm)CheckBox(title,keyName string,isChecked bool)string{
 	o := `
 	<tr>
 		<td>

@@ -13,207 +13,188 @@
 package model
 
 import (
-	"fmt"
 	"database/sql"
-	"Malina/entity"
-	"Malina/config"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/config"
 	"strconv"
 )
 
 var AuthModel = new(authModel)
-type authModel struct{}
-
-func (this *authModel)GetActivation(activation_key string) *entity.Account{
-
-	var id int64
-	var user_name string
-	var user_password string
-	var user_email string
-
-	var exec = []interface{}{activation_key}
-	var querySql = `
-	SELECT id, user_name, user_password, user_email
-	FROM delete_expired_sessions(`+fmt.Sprintf("%v",app.Session_expiration())+`), user_temp
-	WHERE activation_key = $1 LIMIT 1`
-
-	err := Crud.GetRow(querySql, exec).Scan(&id, &user_name, &user_password, &user_email)
-	switch {
-	case err == sql.ErrNoRows:
-		return nil
-	case err != nil:
-		panic(err)
-		return nil
-	default:
-		this.RemoveFromActivateTable(id)
-		return entity.NewAccount(0,user_email,1,user_name,"",user_password,0)
+type authModel struct{
+	Where string
+	Query string
+	All int64
+}
+// param must have format example: CheckDetails("email = ?","ilyaran@mail.ru")
+func (this *authModel)CheckDetails(param, value string){
+	this.Query = `SELECT count(*) FROM account WHERE `+param+` LIMIT 1`
+	err := Crud.GetRow(this.Query, []interface{}{value}).Scan(&this.All)
+	if err == sql.ErrNoRows {
+		this.All = -1
 	}
-	return nil
+	if err != nil {
+		this.All = -2
+	}
+}
+func (this *authModel) AddActivation(email,pass,activation_key, ip_address string) bool {
+	this.Query = `
+		INSERT INTO activation
+		(activation_email,activation_password,activation_key,activation_last_ip)
+		VALUES
+		($1,$2,$3,$4)
+		RETURNING activation_id`
+	//fmt.Println(this.Query)
+	if Crud.Insert(this.Query, []interface{}{email,pass,activation_key,ip_address}) > 0 {
+		return true
+	}
+	return false
 }
 
+func (s *authModel)GetActivation(activation_key string) *entity.Account{
+
+	var id int64
+	var user_name sql.NullString
+	var user_password string
+	var user_email sql.NullString
+
+	err := Crud.GetRow(`
+	WITH t AS (
+		DELETE FROM activation WHERE
+		date_part('epoch',CURRENT_TIMESTAMP)::bigint - activation_created > `+strconv.FormatInt(app.Email_activation_expire(),10)+`
+	)
+	SELECT activation_id, coalesce(activation_nick,''), activation_password, coalesce(activation_email,'')
+	FROM activation WHERE activation_key = $1 LIMIT 1
+	`, []interface{}{activation_key}).Scan(&id, &user_name, &user_password, &user_email)
+
+	if err == sql.ErrNoRows{
+		//panic(err)
+		return nil
+	}
+	if err != nil {
+		panic(err)
+		return nil
+	}
+	go s.RemoveFromActivateTable(id)
+	return entity.NewAccount(user_email.String,user_password)
+}
+
+
 func (this *authModel) RemoveFromActivateTable(id int64) {
-	var exec = []interface{}{id}
-	var querySql = `DELETE FROM user_temp WHERE id = $1`
-	Crud.Delete(querySql, exec)
+	this.Query = `DELETE FROM activation WHERE activation_id = $1`
+	Crud.Delete(this.Query, []interface{}{id})
+}
+func (this *authModel)AddAccount(q string,exec []interface{})int64{
+	this.Query = `INSERT INTO account `+q +` RETURNING account_id`
+	return Crud.Insert(this.Query, exec)
 }
 
 func (this *authModel)DeleteSession(cookieValue string) bool {
-	var exec = []interface{}{cookieValue}
-	var querySql = `DELETE FROM sessions WHERE id = $1`
-	if Crud.Delete(querySql, exec) > 0 {
+	this.Query = `DELETE FROM session WHERE session_id = $1`
+	if Crud.Delete(this.Query, []interface{}{cookieValue}) > 0 {
+		return true
+	}
+	return false
+}
+func (this *authModel) CountLoginAttempts(ip_address string) {
+	this.Query = `SELECT COUNT(*) FROM attempt WHERE attempt_ip = $1`
+	err := Crud.GetRow(this.Query, []interface{}{ip_address}).Scan(&this.All)
+	if err == sql.ErrNoRows {
+		this.All = 0
+	} else if err != nil {
+		panic(err)
+		this.All = -1
+	}
+}
+func (this *authModel) IncreaseLoginAttempts(ip_address string) bool {
+	this.Query = `
+	WITH t AS (
+		DELETE FROM attempt
+		WHERE attempt_time + ` + strconv.Itoa(app.Login_attempts_period()) + ` < date_part('epoch',CURRENT_TIMESTAMP)::bigint
+	)
+	INSERT INTO attempt (attempt_ip)VALUES($1) RETURNING attempt_id`
+	if Crud.Insert(this.Query, []interface{}{ip_address}) > 0 {
+		return true
+	}
+	return false
+}
+func (this *authModel) ClearLoginAttempts(ip_address string) bool {
+	this.Query = `DELETE FROM attempt WHERE attempt_ip = $1`
+	if Crud.Delete(this.Query, []interface{}{ip_address}) > 0 {
 		return true
 	}
 	return false
 }
 func (this *authModel)ForgotPass(email, cryptedNewPass string) (string, bool) {
-	var exec = []interface{}{cryptedNewPass, email}
-	var querySql = `
-		UPDATE users SET user_password = $1
-		WHERE user_email = $2
+	this.Query = `
+		UPDATE account SET account_password = $1 WHERE account_email = $2
 	`
-	if Crud.Update(querySql, exec) > 0 {
+	if Crud.Update(this.Query, []interface{}{cryptedNewPass, email}) > 0 {
 		return email, true
 	}
 	return "", false
 }
 func (this *authModel) DeleteUserByEmailPassword(email,password string) {
 	var exec []interface{}
-	var querySql string
 	if password != ""{
 		exec = []interface{}{email,password}
-		querySql = `
-		DELETE FROM users
-		WHERE user_email = $1 AND user_password = $2
-		`
+		this.Query = `DELETE FROM account WHERE account_email = $1 AND account_password = $2`
 	}else {
 		exec = []interface{}{email}
-		querySql = `
-		DELETE FROM users
-		WHERE user_email = $1
-		`
+		this.Query = `DELETE FROM account WHERE account_email = $1`
 	}
-	Crud.Delete(querySql, exec)
+	Crud.Delete(this.Query, exec)
 }
 
 func (this *authModel) ChangePass(email, cryptedOldPass, cryptedNewPass string) (string, bool) {
-	var userId uint64
-	var exec = []interface{}{email, cryptedOldPass}
-	var querySql = `
-	SELECT user_id FROM users
-	WHERE user_email = $1 AND user_password = $2 LIMIT 1
-	`
-	err := Crud.GetRow(querySql, exec).Scan(&userId)
+	var userId int64
+	this.Query = `SELECT account_id FROM account
+	WHERE account_email = $1 AND account_password = $2 LIMIT 1`
+
+	err := Crud.GetRow(this.Query, []interface{}{email, cryptedOldPass}).Scan(&userId)
 	if err == sql.ErrNoRows {
 		return "no_rows", false
 	} else if err != nil {
 		panic(err)
 		return "server_error", false
 	} else {
-		var exec = []interface{}{cryptedNewPass, email, cryptedOldPass}
-		var querySql = `
-		UPDATE users SET user_password = $1
-		WHERE user_email = $2 AND user_password = $3
+		this.Query = `
+		UPDATE account SET account_password = $1
+		WHERE account_email = $2 AND account_password = $3
 		`
-		if Crud.Update(querySql, exec) > 0 {
-			return "", true
+		if Crud.Update(this.Query, []interface{}{cryptedNewPass, email, cryptedOldPass}) > 0 {
+			return ``, true
 		}
 	}
-	return "", false
+	return ``, false
 }
-
-func (this *authModel) AddActivation(email,nick,phone,pass,activation_key, ip_address string) bool {
-	var exec = []interface{}{email,nick,phone,pass,activation_key,ip_address}
-	var querySql = `
-		INSERT INTO user_temp
-		(user_email,user_name,user_phone,user_password,activation_key,last_ip)
-		VALUES
-		($1, $2, $3, $4, $5, $6)
-		RETURNING id;
-	`
-	if Crud.Insert(querySql, exec) > 0 {
-		return true
-	}
-	return false
-}
-
-func (this *authModel) CountLoginAttempts(ip_address string) int {
-	var exec = []interface{}{ip_address}
-	var querySql = `SELECT COUNT(*) FROM login_attempts WHERE ip_address = $1`
-	var count int
-	err := Crud.GetRow(querySql, exec).Scan(&count)
-	if err == sql.ErrNoRows {
-		return -110
-	} else if err != nil {
-		panic(err)
-		return -100
-	}
-	return count
-}
-
-func (this *authModel) IncreaseLoginAttempts(ip_address string) bool {
-	var exec = []interface{}{ip_address}
-	var querySql = `
-		WITH t as (
-			DELETE FROM login_attempts
-			WHERE attempt_time + ` + strconv.Itoa(app.Login_attempts_period()) + ` < date_part('epoch',CURRENT_TIMESTAMP)::BIGINT
-		)
-		INSERT INTO login_attempts
-		(ip_address) VALUES ( $1 )`
-	if Crud.Insert(querySql, exec) > 0 {
-		return true
-	} //
-	return false
-}
-
-func (this *authModel) ClearLoginAttempts(ip_address string) bool {
-	var exec = []interface{}{ip_address}
-	var querySql = `
-	DELETE FROM login_attempts
-	WHERE ip_address = $1
-	`
-	if Crud.Delete(querySql, exec) > 0 {
-		return true
-	}
-	return false
+func (this *authModel)GetAccountByEmail(email string)*entity.Account{
+	this.Query = `
+	SELECT `+FieldsAccount+`
+	FROM account
+	LEFT JOIN position ON position_id = account_position
+	WHERE account_email = $1 LIMIT 1`
+	row := Crud.GetRow(this.Query, []interface{}{email})
+	return entity.AccountScan(row,nil)
 }
 
 func (this *authModel) CheckIsAllreadySentToActivation(email,nick,phone string) bool {
-	var where string
 	var exec []interface{}
 	if email != "" {
-		where = "user_email = $1"
+		this.Where = "activation_email = $1"
 		exec = []interface{}{email}
 	}else if nick != "" {
-		where = "user_name = $1"
+		this.Where = "activation_nick = $1"
 		exec = []interface{}{nick}
-	}else if nick != "" {
-		where = "user_phone = $1"
-		exec = []interface{}{phone}
 	}
-	var querySql = `SELECT count(*) FROM user_temp WHERE `+where
-	var c int64 = 0
-	err := Crud.GetRow(querySql, exec).Scan(&c)
+	this.Query = `SELECT count(*) FROM activation WHERE ` + this.Where
+
+	err := Crud.GetRow(this.Query, exec).Scan(&this.All)
 	if err == sql.ErrNoRows {
 		return false
 	} else if err != nil {
 		panic(err)
 		return false
 	}
-	return c > 0
+	return this.All > 0
 }
-/*
 
-var querySql = `
-		WITH t as (
-			DELETE FROM login_attempts
-			WHERE attempt_time +86400 < date_part('epoch',CURRENT_TIMESTAMP)::BIGINT
-		)
-		INSERT INTO login_attempts
-		(ip_address)
-		SELECT $1 FROM t
-			WHERE (
-				SELECT COUNT(*)
-				from  login_attempts
-				WHERE ip_address = $1
-				) < $2`
-
- */

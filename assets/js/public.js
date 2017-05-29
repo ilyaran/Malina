@@ -1,26 +1,26 @@
-
 /**
  * Public JavaScripts.  Malina eCommerce application
  *
  *
- * @author		John Aran (Ilyas Toxanbayev)
+ * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
- * @based on
- * @email      		il.aranov@gmail.com
+ * @based on    JQuery
+ * @email      	il.aranov@gmail.com
  * @link
     * @github      	https://github.com/ilyaran/Malina
- * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
+ * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Aranzhanovich Toxanbayev)
  */
 $(document).ready(function () {
     var BaseUrl = $("base").attr("href");
-    if (CART_DETAILS) {
-        setCartContent(CART_DETAILS);
-    }
+    var postData = {};
+    postData.cart_action = 3;
+    request(BaseUrl+"public/cart/crud/","cart_json_list",postData,"json","POST");
+
     function request(uri,action,postData,type,method) {
         $(".error").html("");
         $.ajax({
             beforeSend: function (xhr) {
-                $("#loader").show();
+                //$("#loader").show();
                 xhr.setRequestHeader('X-Requested-With', 'xmlhttprequest');
             },
             method: method,
@@ -28,12 +28,21 @@ $(document).ready(function () {
             data: postData,
             dataType: type
         }).done(function (msg) {
-            $("#loader").hide();
-            //console.log(msg);
+            //$("#loader").hide();
+            console.log(msg);
             if (action=="cart_update"){
                 $("#listing").html(msg);
             }
             if (action=="add_to_cart"){
+                if(msg.Status > 0 ){
+
+                }else {
+                    if(msg.Result) {
+                        setCartContent(msg.Result);
+                    }
+                }
+            }
+            if (action=="cart_json_list"){
                 if(msg.Status > 0 ){
 
                 }else {
@@ -53,7 +62,7 @@ $(document).ready(function () {
                 }
             }
         }).fail(function () {
-            $("#loader").hide();
+            //$("#loader").hide();
             alert("server error");
         });
     }

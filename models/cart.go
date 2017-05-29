@@ -13,7 +13,7 @@
 package model
 
 import (
-	"Malina/entity"
+	"github.com/ilyaran/Malina/entity"
 	"database/sql"
 )
 

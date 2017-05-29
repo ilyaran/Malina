@@ -1,13 +1,13 @@
 /**
- * Filemanager controller class.  Malina eCommerce application
+ * Filemanager controller class.  github.com/ilyaran/Malina eCommerce application
  * The implementation of http://roxyfileman.com/api
  *
- * @author		John Aran (Ilyas Toxanbayev)
+ * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
  * @email      		il.aranov@gmail.com
  * @link
- * @github      	https://github.com/ilyaran/Malina
+ * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
  * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
  */
 package controller
@@ -27,11 +27,11 @@ import (
 	"strconv"
 	"image/gif"
 	"image/png"
-	"Malina/libraries"
-	"Malina/language"
+	"github.com/ilyaran/Malina/libraries"
+	"github.com/ilyaran/Malina/language"
 	"path"
-	"Malina/config"
-	"Malina/models"
+	"github.com/ilyaran/Malina/config"
+	"github.com/ilyaran/Malina/models"
 )
 
 var Filemanager = &filemanager{crud:&CrudController{}}
@@ -41,16 +41,10 @@ type filemanager  struct {
 }
 
 func (this *filemanager) Index(w http.ResponseWriter, r *http.Request) {
-	action := this.crud.authAdmin("filemanager",w,r)
+	this.crud.hasPermission("filemanager","",w,r)
 	this.out = this.resultError("")
-	if (library.VALIDATION.Status == 80){
-		this.out = this.resultError(lang.T("unauth access"))
-		fmt.Fprintf(w, this.out)
-		return
-	}
-	if action!=""{
-		//helper.SetAjaxHeaders(w)
-		switch action {
+	if (library.VALIDATION.Status == 0){
+		switch this.crud.action {
 			case "dirtree"      : this.dirtree(w,r)
 			case "createdir"    : this.createdir(w,r)
 			case "deletedir"    : this.deletedir(w,r)
@@ -65,8 +59,10 @@ func (this *filemanager) Index(w http.ResponseWriter, r *http.Request) {
 			case "movefile"     : this.movefile(w,r)
 			case "copyfile"     : this.copyfile(w,r)
 			case "renamefile"   : this.renamefile(w,r)
-			case "thumb" 	    : this.thumb(w,r);return 
+			case "thumb" 	    : this.thumb(w,r);return
 		}
+	}else {
+		this.out = this.resultError(lang.T("unauth access"))
 	}
 	fmt.Fprintf(w, this.out)
 }

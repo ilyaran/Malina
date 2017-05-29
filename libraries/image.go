@@ -15,7 +15,7 @@ package library
 import (
 	"github.com/disintegration/imaging"
 	"os"
-	"Malina/language"
+	"github.com/ilyaran/Malina/language"
 
 )
 

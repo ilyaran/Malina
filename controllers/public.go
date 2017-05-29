@@ -1,33 +1,35 @@
 /**
- * Public controller.  Malina eCommerce application
+ * Public controller.  github.com/ilyaran/Malina eCommerce application
  *
  *
- * @author		John Aran (Ilyas Toxanbayev)
+ * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
  * @email      		il.aranov@gmail.com
  * @link
- * @github      	https://github.com/ilyaran/Malina
+ * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
  * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
  */
 package controller
 
 import (
 	"net/http"
-	"Malina/views/public"
-	"Malina/libraries"
+	"github.com/ilyaran/Malina/views"
+	"github.com/ilyaran/Malina/views/publicView"
+	"github.com/ilyaran/Malina/libraries"
 	"github.com/gorilla/mux"
-	"Malina/models"
+	"github.com/ilyaran/Malina/models"
 	"fmt"
-	"Malina/helpers"
-	"Malina/language"
+	"github.com/ilyaran/Malina/helpers"
+	"github.com/ilyaran/Malina/language"
 	"time"
-	"Malina/config"
+	"github.com/ilyaran/Malina/config"
 	"encoding/json"
-	"Malina/entity"
 	"regexp"
 	"strconv"
 	"strings"
+	"github.com/ilyaran/Malina/caching"
+
 )
 
 var PublicController = &publicController{crud:&CrudController{}}
@@ -35,44 +37,53 @@ var PublicController = &publicController{crud:&CrudController{}}
 type publicController struct {
 	crud               *CrudController
 	cart_id            string
-	CartPublicListJSON []byte
-	CartPublicList     []*entity.CartPublic
+	//CartPublicListJSON []byte
+	//CartPublicList     []*entity.CartPublic
 }
 
 func (this *publicController) Index(w http.ResponseWriter, r *http.Request) {
+	caching.T0 = time.Now()
+
 	model.PublicModel.Query = ``
 	model.PublicModel.TemporaryData = ``
 	model.PublicModel.Where = ``
 	model.PublicModel.All = 0
 
 	library.SESSION.Authentication(w, r)
-	if library.SESSION.GetSessionObj().GetAccount_id() == 0 {
 
-	}
-	this.CartPublicListJSON = []byte{}
-	this.CartPublicList = []*entity.CartPublic{}
+	///caching.T1 = time.Now()
+	//fmt.Println("Auth After: ", caching.T1.Sub(caching.T0))
 
-	this.cart_id = library.SESSION.GetCookie("cart_id", r)
-	if this.cart_id == `` {
-		library.SESSION.SetCookie("cart_id", library.SESSION.Cryptcode(fmt.Sprintf("%v%v%v", time.Now().UTC().UnixNano(), library.SESSION.GetIP(r), app.Crypt_salt())), true, "/", 68000, w)
-	} else {
-		this.CartPublicList = model.PublicModel.GetCartProducts(this.cart_id)
-		this.CartPublicListJSON, _ = json.Marshal(model.PublicModel.GetCartProducts(this.cart_id))
+	views.LOCALS.W = w
+	views.LOCALS.AccountCartList = nil
+	views.LOCALS.AccountCartListJSON = nil
+
+	// Fetch Cart cookie from database by cart_id from client cookie
+	library.SESSION.GetCookie("cart_id", r)
+	if library.SESSION.CookieString == `` {
+		library.SESSION.SetCookie(
+			"cart_id",
+			library.SESSION.Cryptcode(fmt.Sprintf("%v%v%v", time.Now().UTC().UnixNano(), library.SESSION.GetIP(r), app.Crypt_salt())),
+			true,
+			"/",
+			app.Cart_cookie_expiration(),
+			w)
 	}
 
 	switch mux.Vars(r)["action"] {
-	case "crud" : this.Cart(w, r)
-	case "form" : this.Order(w, r)
-	case "get" : this.ProductItem(w, r)
-	case "list" : this.ProductList(w, r)
-	case "details" : this.CartDetails(w, r)
-	case "ajax" : this.ProductAjaxList(w, r)
-	case "ajax_list" :
-		r.ParseForm()
-		this.inlistUpdateQuery("cart","cart_quantity","integer",r)
-		helper.SetAjaxHeaders(w)
-		fmt.Fprintf(w, public.ListOfCartProducts(model.PublicModel.GetCartProducts(this.cart_id)))
-	default     : this.Welcome(w, r)
+		case "crud" : this.Cart(w, r)
+		case "form" : this.Order(w, r)
+		case "get" : this.ProductItem(w, r)
+		case "list" : this.ProductList(w, r)
+		case "details" : this.CartDetails(w, r)
+		case "ajax" : this.ProductAjaxList(w, r)
+		case "ajax_list" :
+			r.ParseForm()
+			this.inlistUpdateQuery("cart","cart_quantity","integer",r)
+			helper.SetAjaxHeaders(w)
+			publicView.CartViewObj.CartProductsList = model.PublicModel.GetCartProducts(library.SESSION.CookieString)
+			fmt.Fprintf(w, "")
+		default     : this.Welcome(r)
 	}
 
 }
@@ -82,38 +93,44 @@ func (this *publicController) Order(w http.ResponseWriter, r *http.Request) {
 
 
 
-
-
 	}else {
-		w.Write([]byte(public.Header(this.CartPublicListJSON)))
-		w.Write([]byte(public.Order()))
-		w.Write([]byte(public.Footer()))
+
 	}
 }
 
 func (this *publicController) ProductItem(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		caching.T1 = time.Now()
+		fmt.Println("Item Product run in: ", caching.T1.Sub(caching.T0))
+		fmt.Println(`==========================================================`)
+	}()
 	idInt64, _ := library.VALIDATION.IsInt64(false, "id", 20, r)
 	if library.VALIDATION.Status == 0 {
-		var productObj = model.PublicModel.GetProduct(idInt64)
-		if productObj != nil {
-			w.Write([]byte(public.Header(this.CartPublicListJSON)))
-			w.Write([]byte(public.ProductItem(productObj)))
-			w.Write([]byte(public.Footer()))
+		publicView.ProductViewObj.Product = model.PublicModel.GetProduct(idInt64)
+		if publicView.ProductViewObj.Product != nil {
+
+			publicView.ProductViewObj.Item()
 		}
 	}
 }
 
 func (this *publicController) ProductList(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		caching.T1 = time.Now()
+		fmt.Println("Product List run in: ", caching.T1.Sub(caching.T0))
+		fmt.Println(`==========================================================`)
+	}()
 	page,pageStr:=library.VALIDATION.IsInt64(false, "page", 20, r)
 	order := "product_price ASC"
 	if library.VALIDATION.Status == 0 {
 
-		productList := model.PublicModel.GetList("","","",pageStr,strconv.FormatInt(app.Per_page(),10),order)
-		paging := helper.PagingLinks(model.PublicModel.All, page, app.Per_page(), "public/product/list/?page=%d","href","a","","")
+		publicView.ProductViewObj.ProductList = model.PublicModel.GetList("","","",pageStr,strconv.FormatInt(app.Per_page(),10),order)
+		publicView.ProductViewObj.Paging = helper.PagingLinks(model.PublicModel.All, page, app.Per_page(), "public/product/list/?page=%d","href","a","","")
 
-		w.Write([]byte(public.Header(this.CartPublicListJSON)))
-		w.Write([]byte(public.Product(productList,paging)))
-		w.Write([]byte(public.Footer()))
+		caching.T1 = time.Now()
+		fmt.Println("Listing After: ", caching.T1.Sub(caching.T0))
+
+		publicView.ProductViewObj.List()
 	}
 }
 
@@ -168,14 +185,68 @@ func (this *publicController) ProductAjaxList(w http.ResponseWriter, r *http.Req
 			priceInterval = "product_price BETWEEN "+price_minStr+" AND "+price_maxStr
 		}
 
-		var itemList = model.PublicModel.GetList(categoryWhere,priceInterval,search,pageStr,per_pageStr, this.crud.order_by)
-		var paging = helper.PagingLinks(model.PublicModel.All, page, per_page, "%d", "data-page", "span","", `class="paging"`)
+		/*var itemList = */model.PublicModel.GetList(categoryWhere,priceInterval,search,pageStr,per_pageStr, this.crud.order_by)
+		/*var paging =*/ helper.PagingLinks(model.PublicModel.All, page, per_page, "%d", "data-page", "span","", `class="paging"`)
 
 		helper.SetAjaxHeaders(w)
-		w.Write([]byte(public.ProductListing(itemList, paging)))
+		//w.Write([]byte(publicView.ProductListing(itemList, paging)))
 	}
 }
 
+
+func (this *publicController) Welcome(r *http.Request) {
+	//cache.T0 = time.Now()
+	defer func() {
+		caching.T1 = time.Now()
+		fmt.Println("Welcome run in: ", caching.T1.Sub(caching.T0))
+		fmt.Println(`==========================================================`)
+	}()
+
+	caching.T1 = time.Now()
+	fmt.Println("Listing Before: ", caching.T1.Sub(caching.T0))
+
+	if publicView.WelcomeViewObj.ProductList == nil{
+		delete(caching.PublicPages,`welcome`)
+		publicView.WelcomeViewObj.ProductList = model.PublicModel.GetList("", "", "", "0", "20", "product_created DESC")
+	}
+
+	caching.T1 = time.Now()
+	fmt.Println("Listing After: ", caching.T1.Sub(caching.T0))
+
+	publicView.WelcomeViewObj.Welcome()
+}
+func (this *publicController) CartDetails(w http.ResponseWriter, r *http.Request) {
+	publicView.CartViewObj.CartProductsList = model.PublicModel.GetCartProducts(library.SESSION.CookieString)
+	publicView.CartViewObj.Cart()
+}
+func (this *publicController) Cart(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		caching.T1 = time.Now()
+		fmt.Println(`~~~~~~~~~~~~~Cart~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~`)
+		fmt.Println("Cart handler run in: ", caching.T1.Sub(caching.T0))
+		fmt.Println(`~~~~~~~~~~~~~/Cart~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~`)
+	}()
+
+	cart_action, _ := library.VALIDATION.IsInt64(false, "cart_action", 1, r)
+	product_id, _ := library.VALIDATION.IsInt64(false, "product_id", 20, r)
+	helper.SetAjaxHeaders(w)
+	if product_id > 0 {
+		if model.PublicModel.GetProduct(product_id) != nil {
+			switch cart_action {
+			case 1:
+				model.PublicModel.Add_product(library.SESSION.CookieString, product_id)
+			case 2:
+				model.PublicModel.Del_product(library.SESSION.CookieString, product_id)
+			}
+		}else {
+			library.VALIDATION.Status = 100
+			library.VALIDATION.Result["product_id"] = lang.T("not found")
+			return
+		}
+	}
+	views.LOCALS.AccountCartListJSON, _ = json.Marshal(model.PublicModel.GetCartProducts(library.SESSION.CookieString))
+	fmt.Fprintf(w, `{"Status":0,"Result":`+string(views.LOCALS.AccountCartListJSON)+`}`)
+}
 
 func (s *publicController) inlistUpdateQuery(dbtable, columnName, columnType string, r *http.Request) {
 	var valueNum int = 1 // if count numbers 1,2,3 ... to "$1,$2,$3,$4,$5 ..." string
@@ -225,59 +296,4 @@ func (s *publicController) inlistUpdateQuery(dbtable, columnName, columnType str
 		model.Crud.GetRow(fmt.Sprintf(layout_item_query, key[1:], value[1:]),exec)
 	}
 }
-
-func (this *publicController) Welcome(w http.ResponseWriter, r *http.Request) {
-
-	productList := model.PublicModel.GetList("", "", "", "0", "20", "product_created DESC")
-
-	w.Write([]byte(public.Header(this.CartPublicListJSON)))
-	w.Write([]byte(public.Welcome(productList)))
-	w.Write([]byte(public.Footer()))
-}
-
-func (this *publicController) CartDetails(w http.ResponseWriter, r *http.Request) {
-
-	w.Write([]byte(public.Header(this.CartPublicListJSON)))
-	w.Write([]byte(public.Cart(this.CartPublicList)))
-	w.Write([]byte(public.Footer()))
-}
-
-func (this *publicController) Cart(w http.ResponseWriter, r *http.Request) {
-	cart_action, _ := library.VALIDATION.IsInt64(false, "cart_action", 1, r)
-	product_id, _ := library.VALIDATION.IsInt64(false, "product_id", 20, r)
-	var productObj = model.PublicModel.GetProduct(product_id)
-
-	if productObj != nil {
-
-		switch cart_action {
-		case 1:model.PublicModel.Add_product(this.cart_id, product_id)
-		case 2:model.PublicModel.Del_product(this.cart_id, product_id)
-		case 3:model.PublicModel.Add_product(this.cart_id, product_id)
-		case 4:model.PublicModel.Add_product(this.cart_id, product_id)
-		}
-
-		helper.SetAjaxHeaders(w)
-		this.CartPublicListJSON, _ = json.Marshal(model.PublicModel.GetCartProducts(this.cart_id))
-		fmt.Fprintf(w, `{"Status":0,"Result":` + string(this.CartPublicListJSON) + `}`)
-
-	} else {
-		library.VALIDATION.Status = 100
-		library.VALIDATION.Result["product_id"] = lang.T("not found")
-	}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

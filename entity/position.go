@@ -1,27 +1,25 @@
 package entity
 
-import (
-	"database/sql"
-)
 
 import (
+	"database/sql"
 	"fmt"
 	"encoding/json"
 )
 
 type Position struct {
-	Id                    int64			`json:"Id"`
+	Id                    int64			`json:"id"`
 	Parent                *Position			`json:"parent"`
 	Title                 string			`json:"title"`
 	Sort                  int64			`json:"sort"`
 	Level                 int			`json:"level"`
 	Enable                bool			`json:"enable"`
-	PermissionsMap        map[int64]*Permission
+	PermissionsMap        map[int64]*Permission	`json:"permissions"`
 
-	DescendantObjectsList []*Position
-	DescendantIdsMap      map[int64]bool
-	Path                  string
-	DescendantIdsString   string
+	DescendantObjectsList []*Position		`json:"-"`
+	DescendantIdsMap      map[int64]bool		`json:"-"`
+	Path                  string			`json:"-"`
+	DescendantIdsString   string			`json:"-"`
 }
 
 func (s *Position)GetId() int64 {return s.Id}
@@ -58,7 +56,7 @@ func (this *Position) Set_descendants(treeList []*Position) {
 	}
 }
 
-func (this *Position) Exec() []interface{} {
+/*func (this *Position) Exec() []interface{} {
 	return []interface{}{
 		this.Parent.Id,
 		this.Title,
@@ -66,7 +64,7 @@ func (this *Position) Exec() []interface{} {
 		this.Enable,
 		this.Id,
 	}
-}
+}*/
 
 func PositionScan(row *sql.Row, rows *sql.Rows, TreeMap map[int64]*Position) *Position {
 	s := &Position{}
@@ -84,6 +82,7 @@ func PositionScan(row *sql.Row, rows *sql.Rows, TreeMap map[int64]*Position) *Po
 	}else {
 		s.Parent = &Position{}
 	}
+	//fmt.Println(string(permissions))
 	if len(permissions) > 0 {
 
 		err = json.Unmarshal(permissions, &s.PermissionsMap)

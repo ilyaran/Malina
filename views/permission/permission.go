@@ -1,21 +1,20 @@
 package permissionView
 
 import (
-	"Malina/entity"
-	"Malina/language"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/language"
 	"strconv"
-	"Malina/views"
-	"Malina/libraries"
+	"github.com/ilyaran/Malina/views"
+	"github.com/ilyaran/Malina/libraries"
+	"github.com/ilyaran/Malina/views/position"
 )
 
 
 var select_options_order_by string = `
 	<option value="1">`+lang.T("ID")+`&uarr;</option>
 	<option value="2">`+lang.T("ID")+`&darr;</option>
-	<option value="3">`+lang.T("position")+`&uarr;</option>
-	<option value="4">`+lang.T("position")+`&darr;</option>
-	<option value="5">`+lang.T("data")+`&uarr;</option>
-	<option value="6">`+lang.T("data")+`&darr;</option>
+	<option value="3">`+lang.T("data")+`&uarr;</option>
+	<option value="4">`+lang.T("data")+`&darr;</option>
 `
 var table_head = `
 	<th width="5%">ID</th>
@@ -30,13 +29,13 @@ var table_head = `
 func Index(permissionList []*entity.Permission, paging string)string{
 	views.TABLE_FORM.SetNull()
 
-	views.TABLE_FORM.Inputs = views.FACE_FORM.Inputs("permission")
+	views.TABLE_FORM.Inputs = views.ICE_FORM.Inputs("permission")
 	views.TABLE_FORM.Breadcrumb = "Home / Permissions"
 	views.TABLE_FORM.Select_options_order_by = select_options_order_by
 	views.TABLE_FORM.Head = table_head
 	views.TABLE_FORM.Listing = Listing(permissionList,paging)
 	views.TABLE_FORM.Form = Form()
-	views.TABLE_FORM.IndexFrom()
+	views.TABLE_FORM.BuildIndexForm()
 
 	return views.TABLE_FORM.Out + views.Footer()
 }
@@ -52,9 +51,9 @@ func Listing(permissionList []*entity.Permission, paging string)string{
 				<td>` + strconv.FormatInt(i.GetPosition().GetId(),10) + `</td>
 				<td>` + i.GetPosition().GetTitle() + `</td>
 				<td>`
-			if _,ok := library.SESSION.SessionObj.Account.Position.GetDescendantIdsMap()[i.GetPosition().GetId()];
-				ok || library.SESSION.SessionObj.Account.Position.GetParent().GetId() == 0 {
-				out+=`<input data-item_id="` + idStr + `" class="inlist_data" type="text" value="` + i.GetData() +`"/>
+			if _,ok := library.POSITION.TreeMap[library.SESSION.GetSessionObj().GetPositionId()].GetDescendantIdsMap()[i.GetPosition().GetId()];
+				ok || library.POSITION.TreeMap[library.SESSION.GetSessionObj().GetPositionId()].GetParent().GetId() == 0 {
+				out+=`<input data-item_id="` + idStr + `" class="inlist_permission_data" type="text" value="` + i.GetData() +`"/>
 				</td>
 				<td>
 					<button data-item_id="` + idStr + `" class="btn btn-primary edit_item"><span class="glyphicon glyphicon-edit" aria-hidden="true"></span></button>
@@ -92,10 +91,10 @@ func Form()string{
 	out := `
 <div class="row">
 	<div class="col-md-12">` +
-		views.FACE_FORM.BarForms() + `&nbsp;&nbsp;` +
+		views.ICE_FORM.BarForms() + `&nbsp;&nbsp;` +
 		`<span id="select_position">
 			<select id="position_id">
-                        	` + positionView.GetSelectOptionsListView(library.SESSION.SessionObj.Account.Position,false) +`
+                        	` + positionView.GetSelectOptionsListView(library.POSITION.TreeMap[library.SESSION.GetSessionObj().GetPositionId()],"Root",false,false) +`
                         </select>
                         <span id="position_id_error"  class="error"></span>
 		</span>` +

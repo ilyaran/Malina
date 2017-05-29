@@ -24,7 +24,7 @@ type CartPublic struct {
 	Product_img []string	`json:"product_img"`
 	Product_title string	`json:"product_title"`
 	Product_price float64	`json:"product_price"`
-	Product_quantity int64	`json:"product_quantity"`
+	Product_quantity float64 `json:"product_quantity"`
 	Subtotal float64	`json:"subtotal"`
 }
 type Cart struct {

@@ -16,56 +16,72 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"Malina/controllers"
+	"github.com/ilyaran/Malina/controllers"
 	"log"
 	"github.com/gorilla/mux"
-	"Malina/views/public"
-	"Malina/models"
-	"Malina/core"
+	"github.com/ilyaran/Malina/views/publicView"
+
+	"github.com/ilyaran/Malina/core"
+	"github.com/ilyaran/Malina/libraries"
 )
 
 func main() {
 	fmt.Println("Listenning on port : 3001")
+
 	core.MALINA = &core.Malina{}
-	core.MALINA.SetGlobals()
+	if core.MALINA.DB_init() {
 
-	router := mux.NewRouter().StrictSlash(true)
-	router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
+		core.MALINA.LibrariesInit()
+		core.MALINA.PublicViewObjectsInit()
 
-	router.HandleFunc("/", controller.PublicController.Index).Methods("GET")
-	router.HandleFunc("/public/product/{action:(?:list|get)}/", controller.PublicController.Index).Methods("GET")
-	router.HandleFunc("/public/product/{action:(?:ajax)}/", controller.PublicController.Index).Methods("POST")
+		// uncomment if you need to generate crypted password string
+		//generatePasswordForAnyAccount("ilyaran")
 
-	router.HandleFunc("/public/cart/{action:(?:details)}/", controller.PublicController.Index).Methods("GET")
-	router.HandleFunc("/public/cart/{action:(?:crud|ajax_list)}/", controller.PublicController.Index).Methods("POST")
+		router := mux.NewRouter().StrictSlash(true)
+		router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets", http.FileServer(http.Dir("./assets/"))))
 
-	router.HandleFunc("/public/order/{action:(?:form)}/", controller.PublicController.Index).Methods("GET","POST")
+		router.HandleFunc("/", controller.PublicController.Index ).Methods("GET")
 
-	router.HandleFunc("/auth/{action:(?:login|register|logout|forgot|change_password|activation|delete_account)}/", controller.AuthController.Index).Methods("POST","GET")
+		router.HandleFunc("/public/product/{action:(?:list|get)}/", controller.PublicController.Index).Methods("GET")
+		router.HandleFunc("/public/product/{action:(?:ajax)}/", controller.PublicController.Index).Methods("POST")
+		router.HandleFunc("/public/cart/{action:(?:details)}/", controller.PublicController.Index).Methods("GET")
+		router.HandleFunc("/public/cart/{action:(?:crud|ajax_list)}/", controller.PublicController.Index).Methods("POST")
+		router.HandleFunc("/public/order/{action:(?:form)}/", controller.PublicController.Index).Methods("GET", "POST")
 
-	router.HandleFunc("/home/cart/{action:(?:list|ajax_list|add|edit|del|get|inlist)}/", controller.Cart.Index).Methods("POST","GET")
-	router.HandleFunc("/home/product/{action:(?:list|ajax_list|add|edit|del|get|inlist)}/", controller.Product.Index).Methods("POST","GET")
-	router.HandleFunc("/home/category/{action:(?:list|ajax_list|add|edit|del|get|inlist)}/", controller.Category.Index).Methods("POST","GET")
+		router.HandleFunc("/auth/{action:(?:login|register|logout|forgot|change_password|activation|delete_account)}/", controller.AuthController.Index).Methods("POST","GET")
 
-	router.HandleFunc("/home/auth/account/{action:(?:list|ajax_list|add|edit|del|get)}/", controller.Account.Index).Methods("POST","GET")
-	router.HandleFunc("/home/auth/position/{action:(?:list|ajax_list|add|edit|del|get)}/", controller.Position.Index).Methods("POST","GET")
-	router.HandleFunc("/home/auth/permission/{action:(?:list|ajax_list|add|edit|del|get)}/", controller.Permission.Index).Methods("POST","GET")
+		router.HandleFunc("/home/cart/{action:(?:list|list_ajax|add|edit|del|get|inlist)}/", controller.Cart.Index).Methods("POST", "GET")
+		router.HandleFunc("/home/product/{action:(?:list|list_ajax|add|edit|del|get|inlist)}/", controller.Product.Index).Methods("POST", "GET")
+		router.HandleFunc("/home/category/{action:(?:list|list_ajax|add|edit|del|get|inlist)}/", controller.CategoryControllerObj.Index).Methods("POST", "GET")
 
-	router.HandleFunc("/filemanager/{action:(?:dirtree|createdir|deletedir|movedir|copydir|renamedir|fileslist|upload|download|downloaddir|deletefile|movefile|copyfile|renamefile)}/", controller.Filemanager.Index).Methods("POST")
-	router.HandleFunc("/filemanager/{action:(?:thumb)}/", controller.Filemanager.Index).Methods("GET")
+		router.HandleFunc("/home/account/{action:(?:list|list_ajax|add|edit|del|get|inlist)}/", controller.AccountController.Index).Methods("POST", "GET")
+		router.HandleFunc("/home/position/{action:(?:list)}/", controller.PositionController.Index).Methods("GET")
+		router.HandleFunc("/home/position/{action:(?:list|list_ajax|inlist|add|edit|del|get)}/", controller.PositionController.Index).Methods("POST","GET")
 
-	log.Fatal(http.ListenAndServe(":3001", router))
-	model.CloseDb()
-	fmt.Println("Exit")
+		router.HandleFunc("/home/permission/{action:(?:list|list_ajax|inlist|add|edit|del|get)}/", controller.Permission.Index).Methods("POST","GET")
+
+
+		router.HandleFunc("/filemanager/{action:(?:dirtree|createdir|deletedir|movedir|copydir|renamedir|fileslist|upload|download|downloaddir|deletefile|movefile|copyfile|renamefile)}/", controller.Filemanager.Index).Methods("POST")
+		router.HandleFunc("/filemanager/{action:(?:thumb)}/", controller.Filemanager.Index).Methods("GET")
+
+		log.Fatal(http.ListenAndServe(":3001", router))
+
+		//core.MALINA.DB_close()
+		fmt.Println("Exit")
+	}
 }
-
+func generatePasswordForAnyAccount(pass string){
+	fmt.Println("Your password: ",pass)
+	fmt.Println("Crypted password: ",library.SESSION.Cryptcode(pass))
+	fmt.Println(`Replace on database, table "account", column "account_password" with above crypted password`)
+}
 func errorHandler(f func(http.ResponseWriter, *http.Request) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := f(w, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			log.Printf("handling %q: %v", r.RequestURI, err)
-			w.Write([]byte(public.Error(fmt.Sprintf("handling %q: %v", r.RequestURI, err))))
+			w.Write([]byte(publicView.Error(fmt.Sprintf("handling %q: %v", r.RequestURI, err))))
 		}
 	}
 }

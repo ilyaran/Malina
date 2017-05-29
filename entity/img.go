@@ -2,7 +2,7 @@ package entity
 
 import (
 	"encoding/json"
-	"Malina/config"
+	"github.com/ilyaran/Malina/config"
 )
 
 type Img struct {

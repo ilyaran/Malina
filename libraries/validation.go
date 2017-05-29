@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"unicode"
-	"Malina/config"
-	"Malina/language"
+	"github.com/ilyaran/Malina/config"
+	"github.com/ilyaran/Malina/language"
 	"github.com/haisum/recaptcha"
 	"strings"
 	"path"
@@ -104,24 +104,24 @@ func (s *Validation)IsFloat64(isRequired bool, keyName string,length,lengthCent 
 			s.Status = 100
 			s.Result[keyName] = fmt.Sprintf(lang.T("validation required"),keyName)
 		}
-		return 0,"0"
+		return 0.00,"0.00"
 	}
 	if len(formData) > length {
 		s.Status = 100
 		s.Result[keyName] = lang.T(`length no greater then `+strconv.Itoa(length))
-		return 0,"0"
+		return 0.00,"0.00"
 	}
 	matched, _ := regexp.MatchString (`^[0-9]{1,20}(\.[0-9]{0,2})?$`, formData)//(`^(?:[-+]?(?:[0-9]+))?(?:\\.[0-9]*)?(?:[eE][\\+\\-]?(?:[0-9]+))?$`,formData)//("[0-9]{1,20}(\\.[0-9]{0,2})?", formData)
 	if !matched{
 		s.Status = 100
 		s.Result[keyName] = lang.T(`invalid`)
-		return 0,"0"
+		return 0.00,"0.00"
 	}
 	resFloat64,err := strconv.ParseFloat(formData, 64)
 	if err != nil {
 		s.Status = 100
 		s.Result[keyName] = lang.T(`error parse float`)
-		return 0,"0"
+		return 0.00,"0.00"
 	}
 	return resFloat64,formData
 }
@@ -180,7 +180,12 @@ func (s *Validation)RecaptchaValid(recaptchaChannel chan bool, r *http.Request) 
 func (s *Validation)IsEmail(isRequired bool, r *http.Request)(string){
 	var email = r.FormValue("email")
 	if email != "" {
-		match, _ := regexp.MatchString(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`, email)
+		if len(email)>255 {
+			s.Status = 100
+			s.Result["email"] = lang.T(`length no greater then `)+`255`
+			return ""
+		}
+		match, _ := regexp.MatchString(app.Pattern_email(), email)
 		if match {
 			return strings.ToLower(email)
 		}else {
@@ -190,25 +195,25 @@ func (s *Validation)IsEmail(isRequired bool, r *http.Request)(string){
 		}
 	}else if isRequired{
 		s.Status = 100
-		s.Result["email"] = lang.T("auth_email_required")
+		s.Result["email"] = lang.T("email required")
 		return ""
 	}
 	return ""
 }
-func (s *Validation)IsPhone(isRequired bool, r *http.Request)(string){
-	var phone = r.FormValue("phone")
+func (s *Validation)IsPhone(isRequired bool,keyName string, r *http.Request)(string){
+	var phone = r.FormValue(keyName)
 	if phone != "" {
-		match, _ := regexp.MatchString(`^\+[0-9]{10,16}$`, phone)
+		match, _ := regexp.MatchString(app.Pattern_phone(), phone)
 		if match {
 			return phone
 		}else {
 			s.Status = 100
-			s.Result["phone"] = lang.T(`validation phone`)
+			s.Result[keyName] = lang.T(`invalid `)+keyName + `, example: +77058436633`
 			return ""
 		}
 	}else if isRequired {
 		s.Status = 100
-		s.Result["phone"] = fmt.Sprintf(lang.T("validation required"),"phone")
+		s.Result[keyName] = fmt.Sprintf(lang.T("validation required"),keyName)
 		return ""
 	}
 	return ""
@@ -276,7 +281,7 @@ func (s *Validation)PasswordValid(isRequired bool,keyName string,hasNumber,hasUp
 			letters++
 		case unicode.IsLetter(s) || s == ' ':
 			letters++
-		//default:
+			//default:
 			//return false, false, false, false
 		}
 	}

@@ -1,10 +1,10 @@
 package library
 
 import (
-	"Malina/entity"
+	"github.com/ilyaran/Malina/entity"
 	"strings"
 	"fmt"
-	"Malina/config"
+	"github.com/ilyaran/Malina/config"
 	"strconv"
 )
 
@@ -18,7 +18,7 @@ type CategoryLibrary struct {
 	Id, Parent        int64
 }
 
-func (this *CategoryLibrary) SetTrees(categoryList []*entity.Category){
+func (this *CategoryLibrary) SetTrees(categoryList []*entity.Category) {
 	if len(categoryList) > 0 {
 		this.TreeList = []*entity.Category{}
 		this.TreeMap = map[int64]*entity.Category{}
@@ -28,12 +28,12 @@ func (this *CategoryLibrary) SetTrees(categoryList []*entity.Category){
 		var closure func(int64)
 		closure = func(parent int64) {
 			for i := 0; i < len(categoryList); i++ {
-				if categoryList[i].Get_parent() == parent {
+				if categoryList[i].GetParent() == parent {
 					categoryList[i].Set_level(level)
-					this.TreeMap[categoryList[i].Get_id()] = categoryList[i]
+					this.TreeMap[categoryList[i].GetId()] = categoryList[i]
 					this.TreeList = append(this.TreeList, categoryList[i])
 					level ++
-					closure(categoryList[i].Get_id())
+					closure(categoryList[i].GetId())
 				}
 			}
 			level --
@@ -51,39 +51,40 @@ func (this *CategoryLibrary) SetTrees(categoryList []*entity.Category){
 		this.SetPublicListView()
 	}
 }
-func (this *CategoryLibrary) SetSelectOptionsView(){
+func (this *CategoryLibrary) SetSelectOptionsView() {
 	this.SelectOptionsList = ""
 	const dis string = ` disabled="disabled"`
 	const sel string = ` selected="selected"`
 	for _, v := range this.TreeList {
 		this.SelectOptionsList += `<option`
-		if v.Get_id() == this.Id {
+		if v.GetId() == this.Id {
 			this.SelectOptionsList += dis
 		}
-		if v.Get_id() == this.Parent {
+		if v.GetId() == this.Parent {
 			this.SelectOptionsList += sel
 		}
-		this.SelectOptionsList += ` value="` + fmt.Sprintf("%d",v.Get_id()) + `">` + strings.Repeat("&rarr;", v.Get_level()) + v.Get_title() + `</option>`
+		this.SelectOptionsList += ` value="` + fmt.Sprintf("%d", v.GetId()) + `">` + strings.Repeat("&rarr;", v.GetLevel()) + v.GetTitle() + `</option>`
 	}
 }
 
-func (this *CategoryLibrary) SetPublicListView()string{
+func (this *CategoryLibrary) SetPublicListView() string {
 	this.PublicListView = ``
 	for _, v := range this.TreeList {
-		if v.Get_enable() && v.Get_parent() == 0 {
-			if len(v.Get_children())==0{
+		if v.Get_enable() && v.GetParent() == 0 {
+			if len(v.Get_children()) == 0 {
 				this.PublicListView += `
-				<li><a href="` + app.Base_url() + app.Uri_public_product_list() + `?category_id=` + strconv.FormatInt(v.Get_id(),10) + `">
-				<img src="` + v.Get_logo() + `" width="30" height="25">` + v.Get_title() + `</a></li>`
-			}else {
+				<li><a href="` + app.Base_url() + app.Uri_public_product_list() + `?category_id=` + strconv.FormatInt(v.GetId(), 10) + `">
+				<img src="` + v.Get_logo() + `" width="30" height="25">&nbsp;` + v.GetTitle() + `</a></li>`
+			} else {
 				this.PublicListView += `
-				<li class="item11"><a href="` + app.Base_url() + app.Uri_public_product_list() + `?category_id=` + strconv.FormatInt(v.Get_id(),10) + `">
-				<img src="` + v.Get_logo() + `" width="30" height="25">` + v.Get_title() + `<img class="arrow-img" src="`+ app.Assets_public_path() +`images/arrow1.png" alt=""/> </a>
+				<li class="item11"><a href="` + app.Base_url() + app.Uri_public_product_list() + `?category_id=` + strconv.FormatInt(v.GetId(), 10) + `">
+				<img src="` + v.Get_logo() + `" width="30" height="25">&nbsp;` + v.GetTitle() + `<img class="arrow-img" src="` + app.Assets_public_path() + `images/arrow1.png" alt=""/> </a>
 					<ul>`
 
-				this.getChild(v.Get_id())
+					this.getChild(v.GetId())
 
-				this.PublicListView += `
+					this.PublicListView += `
+
 					</ul>
 				</li>`
 			}
@@ -95,18 +96,18 @@ func (this *CategoryLibrary) SetPublicListView()string{
 func (this *CategoryLibrary) getChild(id int64) {
 
 	for _, v := range this.TreeList {
-		if v.Get_enable() && v.Get_parent() == id {
-			if len(v.Get_children())==0{
+		if v.Get_enable() && v.GetParent() == id {
+			if len(v.Get_children()) == 0 {
 				this.PublicListView += `
-				<li><a href="` + app.Base_url() + app.Uri_public_product_list() + strconv.FormatInt(v.Get_id(),10) + `">
-				<img src="` + v.Get_logo() + `" width="30" height="25">` + v.Get_title() + `</a></li>`
-			}else {
+				<li><a href="` + app.Base_url() + app.Uri_public_product_list() + strconv.FormatInt(v.GetId(), 10) + `">
+				<img src="` + v.Get_logo() + `" width="30" height="25">&nbsp;` + v.GetTitle() + `</a></li>`
+			} else {
 				this.PublicListView += `
-				<li class="item11"><a href="` + app.Base_url() + app.Uri_public_product_list() + `?category_id=` + strconv.FormatInt(v.Get_id(),10) + `">
-				<img src="` + v.Get_logo() + `" width="30" height="25">` + v.Get_title() + `<img class="arrow-img" src="`+ app.Assets_public_path() +`images/arrow1.png" alt=""/> </a>
+				<li class="item11"><a href="` + app.Base_url() + app.Uri_public_product_list() + `?category_id=` + strconv.FormatInt(v.GetId(), 10) + `">
+				<img src="` + v.Get_logo() + `" width="30" height="25">&nbsp;` + v.GetTitle() + `<img class="arrow-img" src="` + app.Assets_public_path() + `images/arrow1.png" alt=""/> </a>
 					<ul>`
 
-				this.getChild(v.Get_id())
+				this.getChild(v.GetId())
 
 				this.PublicListView += `
 					</ul>
@@ -115,13 +116,24 @@ func (this *CategoryLibrary) getChild(id int64) {
 		}
 	}
 }
-
-
-/*
-
-<a href="` + app.Base_url() + app.Uri_public_product_list() + `?category_id=` + strconv.FormatInt(v.Get_id(), 10) + `">
-				<img src="` + v.Get_logo() + `" width="30" height="25">
-				<span>` + v.Get_title() + `</span>
-			</a>
- */
-
+func (this *CategoryLibrary) BuildSelectOptionsView(disable map[int64]bool, enable map[int64]bool, selected int64) string {
+	var out string
+	const dis string = ` disabled="disabled"`
+	const sel string = ` selected="selected"`
+	for _, v := range this.TreeList {
+		out += `<option`
+		if disable != nil {
+			if _, ok := disable[v.GetId()]; ok {
+				out += dis
+			}}
+		if enable != nil {
+			if _, ok := enable[v.GetId()]; !ok {
+				out += dis
+			}}
+		if v.GetId() == selected {
+			out += sel
+		}
+		out += ` value="` + fmt.Sprintf("%d", v.GetId()) + `">` + strings.Repeat("&rarr;", v.GetLevel()) + v.GetTitle() + `</option>`
+	}
+	return out
+}

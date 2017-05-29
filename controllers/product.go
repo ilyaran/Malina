@@ -1,29 +1,30 @@
 /**
- * Product Controller class.  Malina eCommerce application
+ * Product Controller class.  github.com/ilyaran/Malina eCommerce application
  *
  *
- * @author		John Aran (Ilyas Toxanbayev)
+ * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
  * @email      		il.aranov@gmail.com
  * @link
- * @github      	https://github.com/ilyaran/Malina
+ * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
  * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
  */
 package controller
 
 import (
 	"net/http"
-	"Malina/helpers"
-	"Malina/models"
-	"Malina/views/product"
-	"Malina/config"
+	"github.com/ilyaran/Malina/helpers"
+	"github.com/ilyaran/Malina/models"
+	"github.com/ilyaran/Malina/views/product"
+	"github.com/ilyaran/Malina/config"
 	"fmt"
 	"encoding/json"
-	"Malina/language"
-	"Malina/entity"
-	"Malina/views"
-	"Malina/libraries"
+	"github.com/ilyaran/Malina/language"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/views"
+	"github.com/ilyaran/Malina/views/publicView"
+	"github.com/ilyaran/Malina/libraries"
 	"html/template"
 	"strconv"
 )
@@ -34,29 +35,44 @@ type ProductController  struct {
 }
 
 func (this *ProductController) Index(w http.ResponseWriter, r *http.Request) {
-	action := this.crud.authAdmin("product",w,r)
-	model.ProductModel.Query = ``
-	model.ProductModel.Where = ``
-	model.ProductModel.All = 0
+	this.crud.hasPermission("product","product_id",w,r)
+	if library.VALIDATION.Status == 0 {
 
-	switch action {
-		case "ajax_list" : if this.AjaxList(w,r) {return}
-		case "get" 	 : if this.Get(w,r) {return}
-		case "add" 	 : this.FormHandler('a',w,r)
-		case "edit" 	 : this.FormHandler('e',w,r)
-		case "inlist" 	 : this.Inlist(w,r)
-		case "del" 	 : this.Del(w,r)
-		default		 : this.List(w,r); return // "list"
+		publicView.WelcomeViewObj.ProductList = nil
+
+		model.ProductModel.Query = ``
+		model.ProductModel.Where = ``
+		model.ProductModel.All = 0
+
+		switch this.crud.action {
+		case "ajax_list":
+			if this.AjaxList(w, r) {
+				return
+			}
+		case "get":
+			if this.Get(w, r) {
+				return
+			}
+		case "add":
+			this.FormHandler('a', w, r)
+		case "edit":
+			this.FormHandler('e', w, r)
+		case "inlist":
+			this.Inlist(w, r)
+		case "del":
+			this.Del(w, r)
+		default:
+			this.List(w, r); return // "list"
+		}
 	}
 	helper.SetAjaxHeaders(w)
-
 	out, _ := json.Marshal(library.VALIDATION)
 	fmt.Fprintf(w, string(out))
 }
 
 func (this *ProductController) List(w http.ResponseWriter, r *http.Request) {
 	page, pageStr := this.crud.getList(false,w,r)
-	order := "product_price ASC"
+	order := "product_updated ASC"
 	if library.VALIDATION.Status == 0 {
 		//all := model.ProductModel.CountItems(nil,0,0,false)
 		itemList := model.ProductModel.GetList("","","",pageStr,strconv.FormatInt(app.Per_page(),10),order,"")

@@ -2,7 +2,7 @@ package lang
 
 import (
 	"fmt"
-	"Malina/config"
+	"github.com/ilyaran/Malina/config"
 	"strconv"
 )
 
@@ -66,7 +66,7 @@ var Dict = map[string]string{
 	`auth_login_allready`:"You had been allready sign in.",
 
 	//login attempts exceed max attempts in config
-	`auth exceed max attempts`:"Attempts exceed max attempts in config. No more than "+ strconv.Itoa(app.Login_attempts())+ " times per 24 hours",
+	`auth exceed max attempts`:"Attempts exceed max attempts in config. No more than "+ strconv.FormatInt(app.Login_attempts(),10)+ " times per 24 hours",
 
 	`auth_email_not_exist`:"Email does not exist",
 	`auth_nick_not_exist`:"Nick does not exist",

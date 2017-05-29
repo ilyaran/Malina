@@ -2,10 +2,11 @@ package categoryView
 
 import (
 	"strconv"
-	"Malina/entity"
-	"Malina/views"
-	"Malina/language"
-	"Malina/config"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/views"
+	"github.com/ilyaran/Malina/language"
+	"github.com/ilyaran/Malina/config"
+
 	"strings"
 )
 
@@ -48,7 +49,7 @@ func Index(categoryList []*entity.Category, paging string)string{
 	views.TABLE_FORM.Head = table_head
 	views.TABLE_FORM.Listing = Listing(categoryList,paging)
 	views.TABLE_FORM.Form = Form()
-	views.TABLE_FORM.IndexFrom()
+	views.TABLE_FORM.BuildIndexForm()
 
 	return `
 	<script type="text/javascript" src="`+app.Assets_path()+`ckeditor/ckeditor.js"></script>
@@ -56,22 +57,21 @@ func Index(categoryList []*entity.Category, paging string)string{
 }
 
 func Listing(categoryList []*entity.Category, paging string)string{
-	var out,idStr string
+	var out, idStr, imgSrc string
 	if categoryList != nil && len(categoryList)>0 {
 		for _, i := range categoryList {
-			idStr = strconv.FormatInt(i.Get_id(),10)
-			var imgSrc string = app.Base_url()+"assets/img/noimg.jpg"
-			if len(i.Get_img())>0{imgSrc = i.Get_img()[0]}
+			idStr = strconv.FormatInt(i.GetId(),10)
+			if i.Get_img()!=nil{imgSrc = i.Get_img()[0]} else {imgSrc = app.No_image()}
 			var checked = ``
 			if i.Get_enable() {checked = `checked`}
 			out += `
 			<tr class="even gradeA">
 				<td>` + idStr + `</td>
-				<td>` + strconv.FormatInt(i.Get_parent(),10) + `</td>
-				<td><input data-item_id="` + idStr + `" style="width:50px;" class="inlist_category_sort" type="number" value="` + strconv.FormatInt(i.Get_sort(),10) + `"/></td>
-				<td>` + strings.Repeat("&rarr;", i.Get_level()) + `
+				<td>` + strconv.FormatInt(i.GetParent(),10) + `</td>
+				<td><input data-item_id="` + idStr + `" style="width:50px;" class="inlist_category_sort" type="number" value="` + strconv.FormatInt(i.GetSort(),10) + `"/></td>
+				<td>` + strings.Repeat("&rarr;", i.GetLevel()) + `
 					&nbsp;<img src="` + imgSrc + `" width='60' height='50' />
-					&nbsp;<input data-item_id="` + idStr + `" class="inlist_category_title" type="text" value="` + i.Get_title() +`"/>
+					&nbsp;<input data-item_id="` + idStr + `" class="inlist_category_title" type="text" value="` + i.GetTitle() +`"/>
 					(`+ strconv.FormatInt(i.Get_quantity(),10) +`)
 				</td>
 				<td>
@@ -107,10 +107,11 @@ func Form()string{
 	out := `
 <div class="row">
 	<div class="col-md-12">` +
-		views.FACE_FORM.BarForms() + `&nbsp;&nbsp;` +
-		`<span id="select_parent">` + views.FACE_FORM.CategorySelect("Root","parent") + `</span>` +
+		views.ICE_FORM.BarForms() + `&nbsp;&nbsp;` +
+		`<span id="select_parent">` + views.ICE_FORM.CategorySelect("Root","parent") + `</span>` +
 		`<br>` +
-		views.FACE_FORM.ImageBar() + `
+		views.ICE_FORM.ImageBar() + `
+		<button class="btn btn-primary submitButton">`+lang.T("Send")+`</button>
                 <table class="table table-striped table-bordered table-hover" >
                 	<tr>
                         	<td>
@@ -125,11 +126,11 @@ func Form()string{
                                 	</div>
                                	</td>
                         </tr>
-                        `+views.FACE_FORM.Enable("enable")+`
-                        `+views.FACE_FORM.Title()+`
-                        `+views.FACE_FORM.Description()+`
+                        `+views.ICE_FORM.CheckBox("enable","enable",true)+`
+                        `+views.ICE_FORM.Title()+`
+                        `+views.ICE_FORM.Description()+`
                 </table>
-                <button id="submitButton" class="btn btn-primary">`+lang.T("Send")+`</button>
+                <button class="btn btn-primary submitButton">`+lang.T("Send")+`</button>
         </div>
 </div>`
 	return out

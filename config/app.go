@@ -2,11 +2,11 @@ package app
 
 const (
 	HOST = "localhost:5432"
-	DB_USER = "postgres"
-	DB_PASSWORD = "postgres"
-	DB_NAME = "malina"
+	USER = "postgres"
+	PASSWORD = "postgres"
+	NAME = "malina"
 )
-
+var base_url = "http://localhost:3001/"
 type  App struct {
 
 	Id int64
@@ -18,6 +18,7 @@ type  App struct {
 	Crypt_salt string
 
 	Session_expiration int64
+	Cart_cookie_expiration int
 	Sms_activation_expiration int64
 	Cookie_expiration int
 	Cookie_name string
@@ -44,7 +45,7 @@ type  App struct {
 	Image_upload_limit int
 
 	//auth
-	Login_attempts int
+	Login_attempts int64
 	Login_attempts_period int
 	Recaptcha_secret string
 	Recaptcha_public string
@@ -102,12 +103,12 @@ type  App struct {
 	Uri_position_del         string
 	Uri_position_get         string
 
-	Uri_account              string
-	Uri_account_ajax         string
-	Uri_account_add          string
-	Uri_account_edit         string
-	Uri_account_del          string
-	Uri_account_get          string
+	Uri_home_account string
+	Uri_account_ajax string
+	Uri_account_add  string
+	Uri_account_edit string
+	Uri_account_del  string
+	Uri_account_get  string
 
 	Uri_cabinet              string
 	Uri_cabinet_add          string
@@ -128,6 +129,8 @@ type  App struct {
 	PasswordMaxLength        int
 
 	Pattern_title string
+	Pattern_phone string
+	Pattern_email string
 
 	//Cart
 	ADD_PRODUCT int8
@@ -136,7 +139,7 @@ type  App struct {
 	SAVE_PRODUCT_FOR_LATER int8
 	MOVE_PRODUCT_TO_CART int8
 }
-var base_url = "http://localhost:3001/"
+
 var app = &App{
 	Tax:0.003,
 	//Cart
@@ -149,16 +152,17 @@ var app = &App{
 	Site_name : "Malina",
 
 	Admin_email : "johnxiaran@gmail.com",
-	Admin_email_pass : "KakLife116692",
+	Admin_email_pass : "",
 
 	Crypt_salt : "tyr2ty4u1rt6xbO7po9c3oa5h",
 
 	Session_expiration : int64(3600),
+	Cart_cookie_expiration: 3600,
 	Sms_activation_expiration : int64(600),
 	Cookie_expiration : 3600,
 	Cookie_name : "malina",
 
-	Per_page : int64(100),
+	Per_page : int64(15),
 	Radius : int64(8),
 
 	Language_list : []string{"en", "ru", "zh-CN"},
@@ -180,7 +184,7 @@ var app = &App{
 	Image_limit_per_item : 12,
 
 	//auth
-	Login_attempts : 12,
+	Login_attempts : int64(12),
 	Login_attempts_period : 3600,
 	Recaptcha_secret : "6Le_zhITAAAAAL2T7WoeckNYcWjeNYj0fg2-3eWe",
 	Recaptcha_public  : "6Le_zhITAAAAAFb3_plfOi_dlxq_BQ5nXppR61tA",
@@ -224,26 +228,26 @@ var app = &App{
 	Uri_product_del          : "home/product/del/",
 	Uri_product_get          : "home/product/get/",
 
-	Uri_permission : "home/auth/permission/",
-	Uri_permission_ajax : "home/auth/permission/ajax_list/",
-	Uri_permission_add : "home/auth/permission/add/",
-	Uri_permission_edit : "home/auth/permission/edit/",
-	Uri_permission_del : "home/auth/permission/del/",
-	Uri_permission_get : "home/auth/permission/get/",
+	Uri_permission : "home/permission/",
+	Uri_permission_ajax : "home/permission/ajax_list/",
+	Uri_permission_add : "home/permission/add/",
+	Uri_permission_edit : "home/permission/edit/",
+	Uri_permission_del : "home/permission/del/",
+	Uri_permission_get : "home/permission/get/",
 
-	Uri_position : "home/auth/position/",
-	Uri_position_ajax : "home/auth/position/ajax_list/",
-	Uri_position_add : "home/auth/position/add/",
-	Uri_position_edit : "home/auth/position/edit/",
-	Uri_position_del : "home/auth/position/del/",
-	Uri_position_get : "home/auth/position/get/",
+	Uri_position : "home/position/",
+	Uri_position_ajax : "home/position/ajax_list/",
+	Uri_position_add : "home/position/add/",
+	Uri_position_edit : "home/position/edit/",
+	Uri_position_del : "home/position/del/",
+	Uri_position_get : "home/position/get/",
 
-	Uri_account : "home/auth/account/",
-	Uri_account_ajax : "home/auth/account/ajax_list/",
-	Uri_account_add : "home/auth/account/add/",
-	Uri_account_edit : "home/auth/account/edit/",
-	Uri_account_del : "home/auth/account/del/",
-	Uri_account_get : "home/auth/account/get/",
+	Uri_home_account:  "home/account/",
+	Uri_account_ajax : "home/account/ajax_list/",
+	Uri_account_add :  "home/account/add/",
+	Uri_account_edit : "home/account/edit/",
+	Uri_account_del :  "home/account/del/",
+	Uri_account_get :  "home/account/get/",
 
 	Uri_cabinet : "cabinet/",
 	Uri_cabinet_add : "cabinet/add/",
@@ -251,19 +255,31 @@ var app = &App{
 	Uri_cabinet_del : "cabinet/del/",
 	Uri_cabinet_get : "cabinet/get/",
 
-	Uri_auth_login : "auth/login/",
-	Uri_auth_register : "auth/register/",
-	Uri_auth_activation : "auth/activation/",
-	Uri_auth_forgot : "auth/forgot/",
-	Uri_auth_change_password : "auth/change_password/",
-	Uri_auth_logout : "auth/logout/",
-	Uri_auth_delete_account : "auth/delete_account/",
+	Uri_auth_login : base_url+"auth/login/",
+	Uri_auth_register : base_url+"auth/register/",
+	Uri_auth_activation : base_url+"auth/activation/",
+	Uri_auth_forgot : base_url+"auth/forgot/",
+	Uri_auth_change_password : base_url+"auth/change_password/",
+	Uri_auth_logout : base_url+"auth/logout/",
+	Uri_auth_delete_account : base_url+"auth/delete_account/",
 
 	PasswordMinLength : 6,
 	PasswordMaxLength : 64,
 
-	Pattern_title : `^[\w_-]{1,255}$`,
+	Pattern_title : `^[\w_-\s]{1,255}$`,
+	Pattern_phone : `^[\+]?[0-9]{8,16}$`,
+	Pattern_email:`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`,
 }
+
+func DB_HOST()string{return HOST}
+func DB_USER()string{return USER
+}
+func DB_PASSWORD()string{return PASSWORD
+}
+func DB_NAME()string{return NAME
+}
+
+
 func Language_list()[]string{return app.Language_list}
 func TAX()float64{return app.Tax}
 func ADD_PRODUCT()int8{return app.ADD_PRODUCT}
@@ -271,10 +287,10 @@ func REMOVE_PRODUCT()int8{return app.REMOVE_PRODUCT}
 func UPDATE_PRODUCTS_QUANTITIES()int8{return app.UPDATE_PRODUCTS_QUANTITIES}
 func SAVE_PRODUCT_FOR_LATER()int8{return app.SAVE_PRODUCT_FOR_LATER}
 func MOVE_PRODUCT_TO_CART()int8{return app.MOVE_PRODUCT_TO_CART}
-func Pattern_title()string { return app.Pattern_title }
 func Image_limit_per_item()int{return app.Image_limit_per_item}
 
 func Session_expiration() int64 {return app.Session_expiration}
+func Cart_cookie_expiration() int{return app.Cart_cookie_expiration}
 func Cookie_expiration() int {return app.Cookie_expiration}
 func Cookie_name() string {return app.Cookie_name}
 func Crypt_salt() string {return app.Crypt_salt}
@@ -297,7 +313,7 @@ func Use_recaptcha_login() bool {return app.Use_recaptcha_login}
 func Use_recaptcha_forgot() bool {return app.Use_recaptcha_forgot}
 func Use_recaptcha_change_password() bool {return app.Use_recaptcha_change_password}
 
-func Login_attempts() int {return app.Login_attempts}
+func Login_attempts() int64 {return app.Login_attempts}
 func Login_attempts_period() int {return app.Login_attempts_period}
 func Recaptcha_secret() string {return app.Recaptcha_secret}
 func Recaptcha_public() string {return app.Recaptcha_public}
@@ -354,7 +370,7 @@ func Uri_position_edit() string {return app.Uri_position_edit}
 func Uri_position_del() string {return app.Uri_position_del}
 func Uri_position_get() string {return app.Uri_position_get}
 
-func Uri_account() string {return app.Uri_account}
+func Uri_account() string {return app.Uri_home_account }
 func Uri_account_ajax() string {return app.Uri_account_ajax}
 func Uri_account_add() string {return app.Uri_account_add}
 func Uri_account_edit() string {return app.Uri_account_edit}
@@ -375,6 +391,9 @@ func Assets_path() string {return app.Assets_path}
 func Assets_backend_path() string {return app.Assets_backend_path}
 func Assets_public_path() string {return app.Assets_public_path}
 
+func Pattern_title()string { return app.Pattern_title }
+func Pattern_phone()string { return app.Pattern_phone }
+func Pattern_email()string { return app.Pattern_email }
 
 /*func SetTable()  {
 	s := reflect.ValueOf(app).Elem()

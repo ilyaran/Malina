@@ -12,51 +12,126 @@
  */
 package entity
 
-import "database/sql"
+import (
+	"database/sql"
+)
 
 type Session struct {
-	Id                 string		`json:"Id"`
-	Ip_address         string		`json:"ip_address"`
-	Account            *Account		`json:"account"`
+	Id         	string
+	Ip_address 	string
 
-	Data                  string		`json:"data"`
-	Data1              string		`json:"data1"`
-	Data2              string		`json:"data2"`
-	Data3              string		`json:"data2"`
+	AccountId      	int64
 
-	User_agent         string		`json:"user_agent"`
+	Email    	string
+	Nick     	string
+	Phone    	string
 
+	Position 	int64
+
+	Provider     	string
+	Token    	string
+
+	Data  		string
+	Data1 		string
+	Data2 		string
+
+	User_agent 	string
+
+	err error
 }
 
-func (s *Session)SetId(id string) {s.Id = id}
+func (s *Session) SetId(id string) { s.Id = id }
 
-func (s *Session)SetData(data string) {s.Data = data}
-func (s *Session)SetData1(data string) {s.Data1 = data}
-func (s *Session)SetData2(data string) {s.Data2 = data}
+func (s *Session) SetData(data string)  { s.Data = data }
+func (s *Session) SetData1(data string) { s.Data1 = data }
+func (s *Session) SetData2(data string) { s.Data2 = data }
 
+func (s *Session) GetId() string         { return s.Id }
+func (s *Session) GetIp_address() string { return s.Ip_address }
+/*func (s *Session) GetAccount() *Account {
+	return &Account{Id:s.AccountId,Email:s.Email,Nick:s.Nick,Phone:s.Phone,Provider:s.Provider,Token:s.Token,
+		Position:&Position{Id:s.Position}}
+}*/
+func (s *Session) GetEmail() string      { return s.Email}
+func (s *Session) GetAccountId() int64   { return s.AccountId}
+func (s *Session) GetPositionId() int64  { return s.Position}
+func (s *Session) GetNick() string       { return s.Nick }
+func (s *Session) GetPhone() string      { return s.Phone }
+func (s *Session) GetProvider() string   { return s.Provider }
+func (s *Session) GetToken() string      { return s.Token }
+func (s *Session) GetData() string       { return s.Data }
+func (s *Session) GetData1() string      { return s.Data1 }
+func (s *Session) GetData2() string      { return s.Data2 }
+func (s *Session) GetUser_agent() string { return s.User_agent }
 
-func (s *Session)GetId() string {return s.Id}
-func (s *Session)GetIp_address() string {return s.Ip_address}
+func (s *Session) SetBaseDataToObject(id,ip,user_agent string) {
+	s.Id = id
+	s.Ip_address=ip
+	s.User_agent=user_agent
+	s.AccountId=0
 
-func (s *Session)GetAccount() *Account {return s.Account}
+	s.Email=``
+	s.Nick=``
+	s.Phone=``
 
-func (s *Session)GetData() string {return s.Data}
-func (s *Session)GetData1() string {return s.Data1}
-func (s *Session)GetData2() string {return s.Data2}
-func (s *Session)GetUser_agent() string {return s.User_agent}
+	s.Position=0
 
+	s.Provider=``
+	s.Token=``
+
+	s.Data =``
+	s.Data1 =``
+	s.Data2 =``
+
+	s.err = nil
+}
+func (s *Session) ScanRow(row *sql.Row) bool {
+
+	s.err = row.Scan(&s.Id, &s.Data, &s.Data1, &s.Data2,
+		&s.AccountId,
+		&s.Email,
+		&s.Nick,
+		&s.Phone,
+		&s.Provider,
+		&s.Token,
+		&s.Position,
+	)
+
+	if s.err == sql.ErrNoRows {
+		panic(s.err)
+		return false
+	}
+	if s.err != nil {
+		panic(s.err)
+		return false
+	}
+	return true
+}
 
 func SessionScan(row *sql.Row, rows *sql.Rows) *Session {
 	s := &Session{}
-	var account_id int64
 	var err error
 	if row != nil {
-		err = row.Scan(&s.Id,&account_id,&s.Data)
+		err = row.Scan(&s.Id, &s.Data, &s.Data1, &s.Data2,
+			&s.AccountId,
+			&s.Email,
+			&s.Nick,
+			&s.Phone,
+			&s.Provider,
+			&s.Token,
+			&s.Position,
+		)
+	} else {
+		err = rows.Scan(&s.Id, &s.Data, &s.Data1, &s.Data2,
+			&s.AccountId,
+			&s.Email,
+			&s.Nick,
+			&s.Phone,
+			&s.Provider,
+			&s.Token,
+			&s.Position,
+		)
 	}
-	if row == nil {
-		err = rows.Scan(&s.Id,&account_id,&s.Data)
-	}
-
 	if err == sql.ErrNoRows {
 		//panic(err)
 		return nil
@@ -65,19 +140,16 @@ func SessionScan(row *sql.Row, rows *sql.Rows) *Session {
 		panic(err)
 		return nil
 	}
-	if account_id > 0 {
-		s.Account = &Account{Id: account_id}
-	}
+
+	//fmt.Println(s)
 	return s
 }
 
-
-func NewSession(id,ip string,account *Account,data,userAgent string) *Session{
+func NewSession(id string, data,data1, data2 string,
+		accountId int64, email,nick,phone string,
+		provider,token string) *Session {
 	return &Session{
-		Id:id,
-		Ip_address:ip,
-		Account:account,
-		Data:data,
-		User_agent:userAgent,
-	}
+		Id:id,Data:data,Data1:data1,Data2:data2,
+		AccountId:accountId,Email:email,Nick:nick,Phone:phone,
+		Provider:provider,Token:token}
 }

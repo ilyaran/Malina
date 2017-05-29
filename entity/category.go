@@ -17,8 +17,8 @@ import (
 	"fmt"
 	"strconv"
 	"encoding/json"
-	"Malina/config"
-	"Malina/helpers"
+	"github.com/ilyaran/Malina/config"
+	"github.com/ilyaran/Malina/helpers"
 	"strings"
 )
 
@@ -79,23 +79,39 @@ func (this *Category) ExecWithId() []interface{} {
 		this.enable,
 	}
 }
-func CategoryScanRow(row *sql.Row) *Category {
+func CategoryScan(row *sql.Row,rows *sql.Rows) *Category {
 	var s = &Category{}
 	var images_sting string
 	//var imgArray []sql.NullString
-	err := row.Scan(
-		&s.id,
-		&s.parent,
-		&s.sort,
+	var err error
+	if row!=nil {
+		err = row.Scan(
+			&s.id,
+			&s.parent,
+			&s.sort,
 
-		&s.title,
-		&s.description,
-		&s.lang,
+			&s.title,
+			&s.description,
+			&s.lang,
 
-		&s.enable,
-		&s.quantity,
-		&images_sting)
+			&s.enable,
+			&s.quantity,
+			&images_sting)
+	}
+	if rows!=nil {
+		err = rows.Scan(
+			&s.id,
+			&s.parent,
+			&s.sort,
 
+			&s.title,
+			&s.description,
+			&s.lang,
+
+			&s.enable,
+			&s.quantity,
+			&images_sting)
+	}
 	if err == sql.ErrNoRows {
 		return nil
 	}
@@ -103,53 +119,27 @@ func CategoryScanRow(row *sql.Row) *Category {
 		panic(err)
 		return nil
 	}
-	if images_sting != `{}` {
+	//fmt.Println(s.id," == ",images_sting)
+	if images_sting != `` {
 		s.img = strings.Split(images_sting,"|")
 	}
 
 	return s
 }
-func CategoryScanRows(rows *sql.Rows) *Category {
-	var s = &Category{}
-	var imgJsonByteArray string
-	err := rows.Scan(
-		&s.id,
-		&s.parent,
-		&s.sort,
 
-		&s.title,
-		&s.description,
-		&s.lang,
-
-		&s.enable,
-		&s.quantity,
-		&imgJsonByteArray)
-
-	if err == sql.ErrNoRows {
-		return nil
-	}
-	if err != nil {
-		panic(err)
-		return nil
-	}
-	if imgJsonByteArray != `` {
-		s.img = strings.Split(imgJsonByteArray,"|") //GetImgCollectionFromJsonString(imgJsonByteArray)
-	}
-	return s
-}
-func (this *Category)  Get_id() int64 {
+func (this *Category) GetId() int64 {
 	return this.id
 }
-func (this *Category)  Get_parent() int64 {
+func (this *Category) GetParent() int64 {
 	return this.parent
 }
-func (this *Category)  Get_level() int {
+func (this *Category) GetLevel() int {
 	return this.level
 }
-func (this *Category)  Get_sort() int64 {
+func (this *Category) GetSort() int64 {
 	return this.sort
 }
-func (this *Category)  Get_title() string {
+func (this *Category) GetTitle() string {
 	return this.title
 }
 func (this *Category)  Get_description() string {
@@ -245,7 +235,7 @@ func (this *Category) Set_descendants(treeList []*Category) {
 func (this *Category)BreadCrumb(home, href, selfTitle string) string {
 	var out string = `<ol class="breadcrumb"><li>` + home + `</li>`
 	for _, i := range this.ancestors {
-		out += `<li><a href="` + href + strconv.FormatInt(i.Get_id(), 64) + `">` + i.Get_title() + `</a></li>`
+		out += `<li><a href="` + href + strconv.FormatInt(i.GetId(), 64) + `">` + i.GetTitle() + `</a></li>`
 	}
 	return out + selfTitle + `</ol>`
 }

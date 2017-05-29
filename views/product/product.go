@@ -2,11 +2,11 @@ package productView
 
 import (
 	"strconv"
-	"Malina/config"
-	"Malina/language"
-	"Malina/entity"
-	"Malina/views"
-	"Malina/libraries"
+	"github.com/ilyaran/Malina/config"
+	"github.com/ilyaran/Malina/language"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/views"
+	"github.com/ilyaran/Malina/libraries"
 	"fmt"
 )
 
@@ -38,10 +38,10 @@ func Index(productList []*entity.Product, paging string)string{
 	views.TABLE_FORM.Head = table_head
 	views.TABLE_FORM.Listing = Listing(productList,paging)
 	views.TABLE_FORM.Form = Form()
-	views.TABLE_FORM.Option1 = views.FACE_FORM.CategorySelect("All","category")
+	views.TABLE_FORM.Option1 = views.ICE_FORM.CategorySelect("All","category")
 	views.TABLE_FORM.Option2 = `<input type="number" id="price_min" placeholder="Min price"/><input type="number" placeholder="Max price" id="price_max"/>`
 
-	views.TABLE_FORM.IndexFrom()
+	views.TABLE_FORM.BuildIndexForm()
 	return `
 	<script type="text/javascript" src="`+app.Assets_path()+`ckeditor/ckeditor.js"></script>
 	` + views.TABLE_FORM.Out + views.Footer()
@@ -60,12 +60,11 @@ var table_head = `
 	</th>
 	`
 func Listing(productList []*entity.Product, paging string)string{
-	var out,idStr string
+	var out,idStr,imgSrc string
 	if productList != nil && len(productList)>0 {
 		for _, i := range productList {
 			idStr = strconv.FormatInt(i.Get_id(),10)
-			var imgSrc string = app.No_image()
-			if len(i.Get_img())>0{imgSrc = i.Get_img()[0]}
+			if i.Get_img() !=nil {imgSrc = i.Get_img()[0]} else {imgSrc = app.No_image()}
 			out += `
 			<tr class="even gradeA">
 				<td>` + idStr + `</td>
@@ -74,11 +73,17 @@ func Listing(productList []*entity.Product, paging string)string{
 					<div>
 						<input data-item_id="` + idStr + `" class="inlist_product_title" type="text" value="` + i.Get_title() +`"/>
 					</div>
-					<div>Category: `; if v,ok := library.CATEGORY.TreeMap[i.Get_category_id()]; ok {out += v.Get_path()}; out += `</div>
+					<div>`; if v,ok := library.CATEGORY.TreeMap[i.Get_category_id()]; ok {out += v.Get_path()}; out += `</div>
 				</td>
-				<td>` + fmt.Sprintf("%.2f",i.Get_price()) + `</td>
-				<td>` + fmt.Sprintf("%.2f",i.Get_price1()) + `</td>
-				<td>` + i.Get_code() + `</td>
+				<td>
+					<input data-item_id="` + idStr + `" class="inlist_product_price" type="text" value="` + fmt.Sprintf("%.2f",i.Get_price()) +`"/>
+				</td>
+				<td>
+					<input data-item_id="` + idStr + `" class="inlist_product_price1" type="text" value="` + fmt.Sprintf("%.2f",i.Get_price1()) +`"/>
+				</td>
+				<td>
+					<input data-item_id="` + idStr + `" class="inlist_product_code" type="text" value="` + i.Get_code() +`"/>
+				</td>
 				<td>
 					<input value="" data-item_id="` + idStr + `" class="inlist_product_enable" type="checkbox" `; if i.Get_enable() {out+=`checked`}; out+=` data-toggle="toggle" >
 					<button data-item_id="` + idStr + `" class="btn btn-primary edit_item"><span class="glyphicon glyphicon-edit" aria-hidden="true"></span></button>
@@ -112,10 +117,11 @@ func Form()string{
 	out := `
 <div class="row">
 	<div class="col-md-12">` +
-		views.FACE_FORM.BarForms() + `&nbsp;&nbsp;` +
-		`<span id="select_category">` + views.FACE_FORM.CategorySelect("","category_id") + `</span>` +
+		views.ICE_FORM.BarForms() + `&nbsp;&nbsp;` +
+		`<span id="select_category">` + views.ICE_FORM.CategorySelect("","category_id") + `</span>` +
 		`<br>` +
-		views.FACE_FORM.ImageBar() + `
+		views.ICE_FORM.ImageBar() + `
+		<button class="btn btn-primary submitButton">`+lang.T("Send")+`</button>
                 <table class="table table-striped table-bordered table-hover" >
                 	<tr>
                         	<td>
@@ -156,11 +162,11 @@ func Form()string{
                                 	</div>
                                	</td>
                         </tr>
-                        `+views.FACE_FORM.Enable("enable")+`
-                        `+views.FACE_FORM.Title()+`
-                        `+views.FACE_FORM.Description()+`
+                        `+views.ICE_FORM.CheckBox("enable","enable",true)+`
+                        `+views.ICE_FORM.Title()+`
+                        `+views.ICE_FORM.Description()+`
                 </table>
-                <button id="submitButton" class="btn btn-primary">`+lang.T("Send")+`</button>
+                <button class="btn btn-primary submitButton">`+lang.T("Send")+`</button>
         </div>
 </div>`
 	return out

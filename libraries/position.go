@@ -2,7 +2,7 @@ package library
 
 import (
 	"fmt"
-	"Malina/entity"
+	"github.com/ilyaran/Malina/entity"
 	"strings"
 )
 
@@ -52,13 +52,14 @@ func (this *PositionLibrary) BuildSelectOptionsView(disable map[int64]bool, enab
 	const sel string = ` selected="selected"`
 	for _, v := range this.TreeList {
 		out += `<option`
-		if SESSION.SessionObj.Account.Position.GetParent().GetId() > 0 {
+		if this.TreeMap[SESSION.GetSessionObj().GetPositionId()].GetParent() != nil {
 			if disable != nil {
 				if _, ok := disable[v.GetId()]; ok {
 					out += dis
 				}
 			} else if enable != nil {
 				if _, ok := enable[v.GetId()]; !ok {
+
 					out += dis
 				}
 			}

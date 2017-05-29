@@ -10,59 +10,116 @@ import (
 	"encoding/hex"
 	"net/smtp"
 	"net"
-	"Malina/models"
-	"Malina/entity"
-	"Malina/config"
+	"github.com/ilyaran/Malina/models"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/config"
 	"crypto/rand"
 )
 
 var SESSION *Session
 type Session struct {
-	cookieString string
+
+	CookieString string
 	SessionObj   *entity.Session
+	StdChars     []byte
 }
 func (s *Session)GetSessionObj() *entity.Session {
 	return s.SessionObj
 }
 func (s *Session) Authentication(w http.ResponseWriter, r *http.Request) {
-	s.cookieString = s.GetCookie(app.Cookie_name(),r)
-	if s.cookieString != "" {
-		s.SessionObj = model.Session.Get(s.cookieString, s.GetIP(r))
-		if s.SessionObj != nil {
+	s.GetCookie(app.Cookie_name(),r) //fmt.Println("Cookie: ",s.CookieString)
+	if s.CookieString != `` {
+		model.Session.Get(s.CookieString)
+		if s.SessionObj.ScanRow(model.Session.Row) {
+			if s.SessionObj.AccountId > 0 {
+				go model.Crud.Update(`
+				UPDATE account SET
+					account_last_logged = now(),
+					account_last_ip = $1
+				WHERE account_id = $2
+				`, []interface{}{s.GetIP(r), s.SessionObj.AccountId})
+			}
 			return
 		}
 	}
-	s.SessionObj = s.SetUnauthSession("unauth",s.GetIP(r),r.Header.Get("User-Agent"),w)
+	s.SetCookieString()
+	s.SessionObj.SetBaseDataToObject(s.CookieString,s.GetIP(r),r.Header.Get("User-Agent"))
+	if model.Crud.Insert(`insert into session
+		(session_id,session_ip,session_agent,session_data) values ($1,$2,$3,'unauth')
+		returning 1`,
+		[]interface{}{s.CookieString,s.SessionObj.Ip_address,s.SessionObj.User_agent}) > 0 {
+
+		s.SetSessionCookie(w)
+	}
 }
 
-func (s *Session) GetCookie(cookieName string,r *http.Request) string {
+func (s *Session) GetCookie(cookieName string,r *http.Request) {
 	cookie, errCookie := r.Cookie(cookieName)
-	if errCookie == nil && regexp.MustCompile(`^[a-z\.\-\_0-9]{30,512}$`).MatchString(cookie.Value) {
-		return cookie.Value
+	if errCookie == nil && regexp.MustCompile(`^[a-zA-Z0-9]{30,255}$`).MatchString(cookie.Value) {
+		s.CookieString = cookie.Value
+	} else {
+		s.CookieString = ``
 	}
-	return ``
 }
-func (s *Session) SetUserDataToSession(sessionId,data string)bool{
-	var session = model.Session.Get(sessionId, "noip")
-	if session != nil {
-		session.SetData(data)
-		if model.Session.Update(session) > 0{
-			return true
+func (s *Session) SetSessionCookie(w http.ResponseWriter) {
+	cookie := http.Cookie{
+		Name: app.Cookie_name(),
+		Value: s.CookieString,
+		HttpOnly: true,
+		Path: "/",
+		MaxAge:app.Cookie_expiration(),
+	}
+	if app.Cookie_expiration() > 0 {
+		cookie.Expires = time.Now().Add(time.Duration(app.Cookie_expiration()))
+	} else {
+		// Set it to the past to expire now.
+		cookie.Expires = time.Unix(1, 0)
+	}
+	http.SetCookie(w, &cookie)
+}
+
+func (s *Session)SetCookieString(){s.CookieString = s.Cryptcode(fmt.Sprintf("%v%v%v", time.Now().UTC().UnixNano(), app.Crypt_salt(),s.Rand_char(12,s.StdChars)))}
+
+func (s *Session) SetSession(accountId int64, data string, w http.ResponseWriter) {
+	s.SetCookieString()
+	if model.Crud.Insert(`
+		INSERT INTO session
+		(
+			session_data,
+			session_id,
+			session_account,
+
+			session_email,
+			session_nick,
+			session_phone,
+
+			session_provider,
+			session_token,
+			session_position
+		)
+		SELECT $1,$2,$3,account_email,account_nick,account_phone,account_provider,account_token,account_position
+		FROM account
+		WHERE account_id = $3
+		returning 1 `,
+		[]interface{}{data, s.CookieString, accountId}) > 0 {
+		s.SetSessionCookie(w)
+	}
+}
+
+func (s *Session) DeleteSession(sessionId string,w http.ResponseWriter) {
+	if model.Session.Del(sessionId) {
+		deleteCookie := http.Cookie{
+			Name: app.Cookie_name(),
+			Value: "none",
+			Expires: time.Now(),
+			HttpOnly: true,
+			Path: "/",
+			MaxAge:1, // 0 - the zero means eternal
 		}
+		http.SetCookie(w, &deleteCookie)
 	}
-	return false
 }
-func (s *Session) SetSession(account *entity.Account,data string,is_flash bool,ip_address, user_agent string, w http.ResponseWriter)*entity.Session {
-	var sessionId string = s.Cryptcode(fmt.Sprintf("%v%v%v", time.Now().UTC().UnixNano(), app.Crypt_salt(), ip_address))
-	var session = entity.NewSession(account,sessionId,ip_address,data,user_agent,is_flash)
-	return s.addSessionToDb(session,w)
-}
-func (s *Session) SetUnauthSession(data string, ip_address, user_agent string, w http.ResponseWriter)*entity.Session {
-	var sessionId string = s.Cryptcode(fmt.Sprintf("%v%v%v", time.Now().UTC().UnixNano(), app.Crypt_salt(), ip_address))
-	var session = entity.NewUnauthSession(sessionId,ip_address,data,user_agent)
-	//fmt.Println(ip_address)
-	return s.addSessionToDb(session,w)
-}
+
 func (s *Session) SetCookie(name,value string,httpOnly bool,path string,max_age int, w http.ResponseWriter){
 	cookie := http.Cookie{
 		Name: name,
@@ -79,39 +136,8 @@ func (s *Session) SetCookie(name,value string,httpOnly bool,path string,max_age 
 	}
 	http.SetCookie(w, &cookie)
 }
-func (s *Session) addSessionToDb(session *entity.Session,w http.ResponseWriter) *entity.Session {
-	if model.Session.Add(session){
-		cookie := http.Cookie{
-			Name: app.Cookie_name(),
-			Value: session.GetId(),
-			HttpOnly: true,
-			Path: "/",
-			MaxAge:app.Cookie_expiration(),
-		}
-		if app.Cookie_expiration() > 0 {
-			cookie.Expires = time.Now().Add(time.Duration(app.Cookie_expiration()))
-		} else {
-			// Set it to the past to expire now.
-			cookie.Expires = time.Unix(1, 0)
-		}
-		http.SetCookie(w, &cookie)
-	}
 
-	return session
-}
-func (s *Session) DeleteSession(sessionId string,w http.ResponseWriter) {
-	if model.Session.Del(sessionId) {
-		deleteCookie := http.Cookie{
-			Name: app.Cookie_name(),
-			Value: "none",
-			Expires: time.Now(),
-			HttpOnly: true,
-			Path: "/",
-			MaxAge:1, // 0 - the zero means eternal
-		}
-		http.SetCookie(w, &deleteCookie)
-	}
-}
+
 func (s *Session) Cryptcode(text string) string {
 	h := sha256.New()
 	h.Write([]byte(text + app.Crypt_salt()))
@@ -158,8 +184,8 @@ func (s *Session) Generate_pinCode(length int) string {
 	return s.Rand_char(length, StdChars)
 }
 func (s *Session) Generate_password(length int) string {
-	var StdChars = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+,.?/:;{}[]`~")
-	return s.Rand_char(length, StdChars)
+
+	return s.Rand_char(length, s.StdChars)
 }
 func (s *Session) Rand_char(length int, chars []byte) string {
 	new_pword := make([]byte, length)

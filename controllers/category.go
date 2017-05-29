@@ -1,52 +1,54 @@
 /**
- * Category controller class.  Malina eCommerce application
+ * Category controller class.  github.com/ilyaran/Malina eCommerce application
  *
  *
- * @author		John Aran (Ilyas Toxanbayev)
+ * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
  * @email      		il.aranov@gmail.com
  * @link
- * @github      	https://github.com/ilyaran/Malina
+ * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
  * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
  */
 package controller
 
 import (
 	"net/http"
-	"Malina/views/category"
-	"Malina/helpers"
-	"Malina/models"
-	"Malina/config"
+	"github.com/ilyaran/Malina/views/category"
+	"github.com/ilyaran/Malina/helpers"
+	"github.com/ilyaran/Malina/models"
+	"github.com/ilyaran/Malina/config"
 	"fmt"
 	"encoding/json"
-	"Malina/language"
-	"Malina/entity"
-	"Malina/views"
+	"github.com/ilyaran/Malina/language"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/views"
 	"html/template"
-	"Malina/libraries"
-	"Malina/core"
+	"github.com/ilyaran/Malina/libraries"
+	"github.com/ilyaran/Malina/core"
 )
 
-var Category = &CategoryController{&CrudController{}}
+var CategoryControllerObj = &CategoryController{&CrudController{}}
 type CategoryController  struct { crud *CrudController }
 
 func (this *CategoryController) Index(w http.ResponseWriter, r *http.Request) {
-	action := this.crud.authAdmin("category",w,r)
-	model.CategoryModel.Query = ``
-	model.CategoryModel.Where = ``
-	model.CategoryModel.All = 0
-	switch action {
-		case "ajax_list" : if this.AjaxList(w,r) {return}
-		case "get" 	 : if this.Get(w,r) {return}
-		case "add" 	 : this.FormHandler('a',w,r)
-		case "edit" 	 : this.FormHandler('e',w,r)
-		case "del" 	 : this.Del(w,r)
-		case "inlist" 	 : this.Inlist(w,r)
-		default		 : this.List(w,r); return // "list"
+	this.crud.hasPermission("category","category_id",w,r)
+	if library.VALIDATION.Status == 0 {
+		model.CategoryModel.Query = ``
+		model.CategoryModel.Where = ``
+		model.CategoryModel.All = 0
+
+		switch this.crud.action {
+		case "ajax_list":if this.AjaxList(w, r) {return}
+		case "get":if this.Get(w, r) {return}
+		case "add":this.FormHandler('a', w, r)
+		case "edit":this.FormHandler('e', w, r)
+		case "del":this.Del(w, r)
+		case "inlist":this.Inlist(w, r)
+		default:this.List(w, r); return // "list"
+		}
 	}
 	helper.SetAjaxHeaders(w)
-
 	out, _ := json.Marshal(library.VALIDATION)
 	fmt.Fprintf(w, string(out))
 }
@@ -74,11 +76,11 @@ func (this *CategoryController) AjaxList(w http.ResponseWriter, r *http.Request)
 	page, pageStr, per_page, per_pageStr, search, order_by := this.crud.getAjaxList(false, w, r)
 	var order = "category_sort ASC"
 	switch order_by {
-		case 2:order = "category_sort DESC"
-		case 3:order = "category_id ASC"
-		case 4:order = "category_id DESC"
-		case 5:order = "category_title ASC"
-		case 6:order = "category_title DESC"
+	case 2:order = "category_sort DESC"
+	case 3:order = "category_id ASC"
+	case 4:order = "category_id DESC"
+	case 5:order = "category_title ASC"
+	case 6:order = "category_title DESC"
 	}
 	if library.VALIDATION.Status == 0 {
 		var itemList []*entity.Category
@@ -163,7 +165,7 @@ func (this *CategoryController) FormHandler(action byte,w http.ResponseWriter, r
 		if res > 0{
 			core.MALINA.SetCategoryGlobals()
 			library.VALIDATION.Status = 0
-			library.VALIDATION.Result["select_parent"] = views.FACE_FORM.CategorySelect("Root","parent")
+			library.VALIDATION.Result["select_parent"] = views.ICE_FORM.CategorySelect("Root","parent")
 		}else {
 			library.VALIDATION.Status = 30
 			library.VALIDATION.Result["error"] = lang.T(`server error`)

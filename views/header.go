@@ -1,9 +1,9 @@
 package views
 
 import (
-	"Malina/config"
-	"Malina/language"
-	"Malina/libraries"
+	"github.com/ilyaran/Malina/config"
+	"github.com/ilyaran/Malina/language"
+	"github.com/ilyaran/Malina/libraries"
 )
 
 func Header()string  {
@@ -20,7 +20,7 @@ func Header()string  {
 		<base href="`+ app.Base_url() +`">
 		<meta name="description" content="Source code generated using layoutit.com">
 		<meta name="author" content="LayoutIt!">
-
+		<link rel="apple-touch-icon" sizes="76x76" href="assets/apple-icon-76x76.png">
 		<link href="`+ app.Assets_backend_path() +`css/bootstrap.min.css" rel="stylesheet">
 		<link href="`+ app.Assets_backend_path() +`css/style.css" rel="stylesheet">
 
@@ -48,8 +48,6 @@ func Header()string  {
 		<div class="container-fluid">
 			<div class="row">
 				<div class="col-md-12">
-
-
 	`
 }
 
@@ -97,11 +95,11 @@ func Nav(active string)string  {
 			</ul>
 
 			<ul class="nav navbar-nav navbar-right">
-				`; if library.SESSION.GetSessionObj().GetAccount_id() > 0 {out+=`
-				<li><a href="">` + library.SESSION.GetSessionObj().GetEmail() + `&nbsp;`+library.SESSION.GetSessionObj().GetNick() + `</a></li>
-				<li><a href="` + app.Base_url() + `auth/logout/">` + lang.T("logout") + `</a></li>
+				`; if library.SESSION.GetSessionObj().GetAccountId() > 0 {out+=`
+				<li><a href="">` + library.SESSION.GetSessionObj().GetEmail() + `</a></li>
+				<li><a href="` + app.Uri_auth_logout() + `">` + lang.T("logout") + `</a></li>
 				`}else {
-				out += `<li><a href="` + app.Base_url() + `auth/login/">` + lang.T("login") + `</a></li>`
+				out += `<li><a href="` + app.Uri_auth_login() + `">` + lang.T("login") + `</a></li>`
 				}; out+=`
 				<li class="dropdown">
 					<a href="#" class="dropdown-toggle" data-toggle="dropdown">Dropdown<strong class="caret"></strong></a>

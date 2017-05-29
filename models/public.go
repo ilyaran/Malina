@@ -14,7 +14,7 @@ package model
 
 import (
 	"database/sql"
-	"Malina/entity"
+	"github.com/ilyaran/Malina/entity"
 	"strings"
 )
 
@@ -112,6 +112,7 @@ func (this *publicModel)GetCartProducts(cart_id string)[]*entity.CartPublic{
 	this.Query  = `
 		SELECT * FROM cart_get_products($1)
 	`
+	this.TemporaryData = ``
 	var rows = Crud.GetRows(this.Query , []interface{}{cart_id})
 	defer rows.Close()
 	var cartList = []*entity.CartPublic{}
@@ -122,11 +123,22 @@ func (this *publicModel)GetCartProducts(cart_id string)[]*entity.CartPublic{
 		if err != nil {
 			panic(err)
 		}
-		item.Product_img = strings.Split(this.TemporaryData,"|")
+		if this.TemporaryData != `` {
+			item.Product_img = strings.Split(this.TemporaryData,"|")
+		}
 		cartList = append(cartList, item)
 	}
 	return cartList
 }
+
+func (this *publicModel)CountCartProducts(cart_id string){
+	this.Query  = `SELECT sum(cart_quantity) FROM cart WHERE cart_id = $1`
+	err := Crud.GetRow(this.Query , []interface{}{cart_id}).Scan(&this.All)
+	if err != nil {
+		this.All = 0
+	}
+}
+
 
 func (this *publicModel)Get_saved_products(cart_id string, product_id int64)*sql.Row{
 	this.Query  = `

@@ -18,7 +18,7 @@ import (
 )
 
 type Account struct {
-	Id           int64         `json:"Id"`
+	Id           int64         `json:"id"`
 	Position     *Position     `json:"position"`
 	Nick         string        `json:"nick"`
 	Email        string        `json:"email"`
@@ -69,57 +69,50 @@ func(s *Account)SetPhone (phone string) {s.Phone=phone}
 
 func AccountScan(row *sql.Row,rows *sql.Rows) *Account {
 	s := &Account{}
-	var positionId 		int64
+	var positionId 	int64
 
 	var err error
 	if row!=nil{
 		err = row.Scan(
 			&s.Id,
 			&positionId,
-			&s.Nick,
-
-			&s.Password,
 			&s.Email,
+			&s.Nick,
+			&s.Password,
+			&s.Phone,
+			&s.Provider,
+			&s.Token,
 			&s.Ban,
-
 			&s.Ban_reason,
 			&s.Newpass,
 			&s.Newpass_key,
-
 			&s.Newpass_time,
 			&s.Last_ip,
 			&s.Last_logged,
-
 			&s.Created,
 			&s.Updated,
-			&s.Phone,
-
-			&s.Provider,
-			&s.Token)
-	}else {
+		)
+	}
+	if rows!=nil{
 		err = rows.Scan(
 			&s.Id,
 			&positionId,
-			&s.Nick,
-
-			&s.Password,
 			&s.Email,
+			&s.Nick,
+			&s.Password,
+			&s.Phone,
+			&s.Provider,
+			&s.Token,
 			&s.Ban,
-
 			&s.Ban_reason,
 			&s.Newpass,
 			&s.Newpass_key,
-
 			&s.Newpass_time,
 			&s.Last_ip,
 			&s.Last_logged,
-
 			&s.Created,
 			&s.Updated,
-			&s.Phone,
-
-			&s.Provider,
-			&s.Token)
+		)
 	}
 	if err == sql.ErrNoRows {
 		return nil

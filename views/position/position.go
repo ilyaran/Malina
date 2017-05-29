@@ -1,77 +1,45 @@
 package positionView
 
 import (
-	"Malina/entity"
-	"Malina/language"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/language"
 	"strconv"
-	"Malina/config"
-	"Malina/views"
+	"github.com/ilyaran/Malina/views"
 	"strings"
-	"Malina/libraries"
+	"github.com/ilyaran/Malina/libraries"
 )
 
+var select_options_order_by string = `
+	<option value="1">`+lang.T("sort")+`&uarr;</option>
+	<option value="2">`+lang.T("sort")+`&darr;</option>
+	<option value="3">`+lang.T("ID")+`&uarr;</option>
+	<option value="4">`+lang.T("ID")+`&darr;</option>
+	<option value="5">`+lang.T("title")+`&uarr;</option>
+	<option value="6">`+lang.T("title")+`&darr;</option>
+`
+var table_head = `
+	<th width="5%">ID</th>
+	<th width="5%">`+lang.T("parent")+`</th>
+	<th width="5%">`+lang.T("sort")+`</th>
+	<th >`+lang.T("title")+`</th>
+	<th width="20%">
+		Enable<input checked type="checkbox" onchange="if(this.checked){$('.inlist_enable').bootstrapToggle('on');}else{$('.inlist_enable').bootstrapToggle('off');}">
+		<button id="submitInlistButton" class="btn btn-success"><span class="glyphicon glyphicon-save" aria-hidden="true"></span></button>
+		Delete<input type="checkbox"  onchange="if(this.checked){$('.inlist_del').prop('checked',true);}else{$('.inlist_del').prop('checked',false);}">
+	</th>
+	`
 func Index(positionList []*entity.Position, paging string)string{
-	var inputs = `
-	<input type="hidden" value="position" id="dbtable"/>
-	<input type="hidden" value="`+app.No_image()+`" id="url_no_image"/>
-	<input type="hidden" value="`+app.Base_url()+app.Upload_path()+`" id="url_upload_path"/>
-	<input type="hidden" value="`+app.Base_url()+app.Uri_position_ajax()+`" id="url_position_list_ajax"/>
-	<input type="hidden" value="`+app.Base_url()+app.Uri_position_get()+`" id="url_position_get"/>
-	<input type="hidden" value="`+app.Base_url()+app.Uri_position_add()+`" id="url_position_add"/>
-	<input type="hidden" value="`+app.Base_url()+app.Uri_position_edit()+`" id="url_position_edit"/>
-	<input type="hidden" value="`+app.Base_url()+app.Uri_position_del()+`" id="url_position_del"/>`
-	var out = inputs + `
-<div class="row">
-	<div class="col-md-12">
+	views.TABLE_FORM.SetNull()
 
-		<div class="panel panel-default">
-			<div class="panel-heading">
-				<h3 class="panel-title">Home / Positions</h3>
-			</div>
-		  	<div class="panel-body">
-		    		`+lang.T("per page")+`
-				`+views.FACE_FORM.PerPageSelectForm()+`
-				&nbsp;&nbsp;
-				<input type="text" class="form-control" id="search" name="search"  placeholder="Search for...">
+	views.TABLE_FORM.Inputs = views.ICE_FORM.Inputs("position")
+	views.TABLE_FORM.Breadcrumb = "Home / Positions"
+	views.TABLE_FORM.Select_options_order_by = select_options_order_by
+	views.TABLE_FORM.Head = table_head
+	views.TABLE_FORM.Listing = Listing(positionList,paging)
+	views.TABLE_FORM.Form = Form()
+	views.TABLE_FORM.BuildIndexForm()
 
-		    		<button id="get_list" class="btn btn-primary" type="button" >`+lang.T("go")+`</button>
-
-		  	</div>
-		</div>
-
-		<ul class="nav nav-tabs">
-                	<li class="active"><a href="#home" data-toggle="tab">`+lang.T("list")+`</a></li>
-                        <li class=""><a href="#form" data-toggle="tab">` + lang.T("form") + `</a></li>
-		</ul>
-		<div class="tab-content">
-			<div class="tab-pane fade active in" id="home">
-				<table class="table table-striped table-bordered table-hover" id="dataTables-example">
-					<thead>
-						<tr>
-							<th>ID</th>
-							<th>`+lang.T("title")+`</th>
-							<th></th>
-						</tr>
-
-					</thead>
-					<tbody id="listing">
-					`
-						out += Listing(positionList,paging)+`
-
-					</tbody>
-				</table>
-			</div>
-			<div class="tab-pane fade" id="form">
-				`+Form()+`
-
-			</div>
-		</div>
-	</div>
-</div>
-
-`+ views.Footer()
-
-	return out
+	return views.TABLE_FORM.Out + views.Footer()
 }
 
 func Listing(positionList []*entity.Position, paging string)string{
@@ -79,14 +47,31 @@ func Listing(positionList []*entity.Position, paging string)string{
 	if positionList != nil && len(positionList)>0 {
 		for _, i := range positionList {
 			idStr = strconv.FormatInt(i.GetId(),10)
+			var checked = ``
+			if i.GetEnable() {checked = `checked`}
 			out += `
 			<tr class="even gradeA">
 				<td>` + idStr + `</td>
-				<td>` + strings.Repeat("&rarr;", i.GetLevel()) + `&nbsp;` + i.GetTitle()  + `</td>
+				<td>` + strconv.FormatInt(i.GetParent().GetId(),10) + `</td>
+				<td><input data-item_id="` + idStr + `" style="width:50px;" class="inlist_position_sort" type="number" value="` + strconv.FormatInt(i.GetSort(),10) + `"/></td>
 				<td>
-					<a data-item_id="` + idStr + `" class="btn btn-primary edit_item"><span class="glyphicon glyphicon-edit" aria-hidden="true"></span></a>
-					<a data-item_id="` + idStr + `" class="btn btn-danger del_item"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></a>
+				` + strings.Repeat("&rarr;", i.GetLevel()) + `&nbsp;`
+			if _,ok := library.POSITION.TreeMap[library.SESSION.GetSessionObj().GetPositionId()].GetDescendantIdsMap()[i.GetId()]; ok || library.POSITION.TreeMap[library.SESSION.GetSessionObj().GetPositionId()].GetParent().GetId() == 0 {
+				out += `
+					<input data-item_id="` + idStr + `" class="inlist_position_title" type="text" value="` + i.GetTitle() +`"/>
 				</td>
+				<td>
+					<input value="" data-item_id="` + idStr + `" class="inlist_position_enable" type="checkbox" `+checked+` data-toggle="toggle" >
+					<button data-item_id="` + idStr + `" class="btn btn-primary edit_item"><span class="glyphicon glyphicon-edit" aria-hidden="true"></span></button>
+					<button data-item_id="` + idStr + `" class="btn btn-danger del_item"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></button>
+					<input value="0" data-item_id="` + idStr + `" class="inlist_del" type="checkbox">
+				</td>`
+
+			}else {
+				out += i.GetTitle()+`</td><td><td></td>`
+			}
+			out+=`
+
 			</tr>`
 		}
 		out += `
@@ -111,43 +96,20 @@ func Listing(positionList []*entity.Position, paging string)string{
 }
 
 func Form()string{
+
 	out := `
 <div class="row">
-	<div class="col-md-12">
-		<div class="form-group">
-			<div id="error" class="error"></div>
-			<select id="action">
-				<option value="add">`+lang.T("add")+`</option>
-				<option value="get">`+lang.T("get")+`</option>
-				<option value="edit">`+lang.T("edit")+`</option>
-				<option value="delete">`+lang.T("delete")+`</option>
-			</select>
-                        <span style = "display:none;" id = "item_id_bar">
-                        	<span>`+lang.T("id")+`:</span>
-                        	<input id = "item_id" value="" type="integer"/>
-                        	<span id = "item_id_error" class="error"></span>
-                        </span>
-                        <button id = "success_bar" style="display:none;" type="button" class="btn btn-success btn-lg">Success</button>
-                </div>
-                <button id="submitButton" class="btn btn-primary">`+lang.T("Send")+`</button>
-
+	<div class="col-md-12">` +
+		views.ICE_FORM.BarForms() + `&nbsp;&nbsp;` +
+		`Parent Position <span id="select_parent">
+			<select id="parent">
+                                ` + GetSelectOptionsListView(library.POSITION.TreeMap[library.SESSION.GetSessionObj().GetPositionId()],"Root",true,true) +`
+                        </select>
+		</span>` +
+		`<br>
+		<button class="btn btn-primary submitButton">`+lang.T("Send")+`</button>
                 <table class="table table-striped table-bordered table-hover" >
                 	<tr>
-                        	<td>
-                                	<label>`+lang.T("parent")+`
-                                		<span id="parent_error"  class="error"><span>
-                                	</label>
-                                </td>
-                                <td>
-                                	<div class="form-group">
-                                		<select id="parent">
-                                			<option value="0">Root</option>
-                                			`+library.POSITION.SelectOptionsList +`
-                                		</select>
-                                        </div>
-                               	</td>
-                        </tr>
-                        <tr>
                         	<td>
                                 	<div class="form-group">
                                             	<label>`+lang.T("sort")+`
@@ -160,31 +122,27 @@ func Form()string{
                                 	</div>
                                	</td>
                         </tr>
-			<tr>
-                        	<td>
-                                	<label>`+lang.T("enable")+`</label>
-                                </td>
-                                <td>
-                                	<div class="form-group">
-                                        	<input id="enable" type="checkbox" checked class="form-control" />
-                                	</div>
-                               	</td>
-                        </tr>
-                	<tr>
-                        	<td>
-                                	<label>`+lang.T("title")+`<span class="error">*</span>
-                                		<span id="title_error"  class="error"><span>
-                                	</label>
-                                </td>
-                                <td>
-                                	<div class="form-group">
-                                        	<input id="title"  class="form-control" />
-                                	</div>
-                               	</td>
-                        </tr>
+                        `+views.ICE_FORM.CheckBox("enable","enable",true)+`
+                        `+views.ICE_FORM.Title()+`
 
                 </table>
+                <button class="btn btn-primary submitButton">`+lang.T("Send")+`</button>
         </div>
 </div>`
 	return out
+}
+
+func GetSelectOptionsListView(currentPosition *entity.Position, rootTitle string, isIncludedOwnId, hasRoot bool)string{
+
+	if isIncludedOwnId || currentPosition.GetParent().GetId() == 0 {
+		currentPosition.GetDescendantIdsMap()[currentPosition.GetId()]=false
+
+	}
+	positionOptionsList := library.POSITION.BuildSelectOptionsView(nil, currentPosition.GetDescendantIdsMap(), 0)
+	if currentPosition.GetParent().GetId() == 0 {
+		if hasRoot {
+			positionOptionsList = `<option value="0">`+rootTitle+`</option>` + positionOptionsList
+		}
+	}
+	return positionOptionsList
 }

@@ -1,11 +1,11 @@
 package cartView
 
 import (
-	"Malina/entity"
-	"Malina/views"
-	"Malina/language"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/views"
+	"github.com/ilyaran/Malina/language"
 	"fmt"
-	"Malina/config"
+	"github.com/ilyaran/Malina/config"
 )
 
 var inputs string = `
@@ -37,7 +37,7 @@ func Index(cartList []*entity.Cart, paging string)string{
 	views.TABLE_FORM.Head = table_head
 	views.TABLE_FORM.Listing = Listing(cartList,paging)
 	views.TABLE_FORM.Form = Form()
-	views.TABLE_FORM.IndexFrom()
+	views.TABLE_FORM.BuildIndexForm()
 
 	return `
 	<script type="text/javascript" src="`+app.Assets_path()+`ckeditor/ckeditor.js"></script>
@@ -111,7 +111,7 @@ func Form()string{
 	out := `
 <div class="row">
 	<div class="col-md-12">` +
-		views.FACE_FORM.BarForms() + `&nbsp;&nbsp;
+		views.ICE_FORM.BarForms() + `&nbsp;&nbsp;
                 <table class="table table-striped table-bordered table-hover" >
                 	<tr>
                         	<td>
@@ -140,7 +140,7 @@ func Form()string{
                                	</td>
                         </tr>
 
-                        `+views.FACE_FORM.Enable("buy_now")+`
+                        `+views.ICE_FORM.CheckBox("buy_now","buy_now",false)+`
 
                 </table>
                 <button id="submitButton" class="btn btn-primary">`+lang.T("Send")+`</button>
