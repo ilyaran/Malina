@@ -2,13 +2,13 @@
  * Main file for Malina eCommerce application
  *
  *
- * @author		John Aran (Ilyas Toxanbayev)
+ * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
  * @email      il.aranov@gmail.com
  * @link
  * @github      https://github.com/ilyaran/Malina
- * @license	MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
+ * @license	MIT License Copyright (c) 2017 John Aran (Ilyas Aranzhanovich Toxanbayev)
  */
 
 package main
