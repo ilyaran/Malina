@@ -15,4 +15,8 @@ https://github.com/ilyaran/Malina/archive/master.zip
 3. Open /config/app.go file and set your settings
 4. Open /assets/filemanager/conf.json file and set your configuration
 
+Admin (Boss) account email: ilyaran@mail.ru, password: ilyaran
+You can generate a password for any user, open main.go file and uncomment where generatePasswordForAnyAccount("your password").
+You'll see crypted password in terminal, should replace password column in database
+
 Enjoy, and contributions are more than welcome!
