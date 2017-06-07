@@ -121,7 +121,7 @@ func (this *productModel) CountItems(
 	search,
 	enableItems string){
 	if search != `` {
-		this.Where = `INNER JOIN to_tsquery('` + search + `') AS query_string ON search_vector @@ query_string`
+		this.Where = ` INNER JOIN to_tsquery('` + search + `') AS query_string ON search_vector @@ query_string`
 	}
 	if enableItems != `` {
 		this.Where += " WHERE " + enableItems

@@ -50,15 +50,15 @@ func main() {
 
 		router.HandleFunc("/auth/{action:(?:login|register|logout|forgot|change_password|activation|delete_account)}/", controller.AuthController.Index).Methods("POST","GET")
 
-		router.HandleFunc("/home/cart/{action:(?:list|list_ajax|add|edit|del|get|inlist)}/", controller.Cart.Index).Methods("POST", "GET")
-		router.HandleFunc("/home/product/{action:(?:list|list_ajax|add|edit|del|get|inlist)}/", controller.Product.Index).Methods("POST", "GET")
-		router.HandleFunc("/home/category/{action:(?:list|list_ajax|add|edit|del|get|inlist)}/", controller.CategoryControllerObj.Index).Methods("POST", "GET")
+		router.HandleFunc("/home/cart/{action:(?:list|ajax_list|add|edit|del|get|inlist)}/", controller.Cart.Index).Methods("POST", "GET")
+		router.HandleFunc("/home/product/{action:(?:list|ajax_list|add|edit|del|get|inlist)}/", controller.Product.Index).Methods("POST", "GET")
+		router.HandleFunc("/home/category/{action:(?:list|ajax_list|add|edit|del|get|inlist)}/", controller.CategoryControllerObj.Index).Methods("POST", "GET")
 
-		router.HandleFunc("/home/account/{action:(?:list|list_ajax|add|edit|del|get|inlist)}/", controller.AccountController.Index).Methods("POST", "GET")
+		router.HandleFunc("/home/account/{action:(?:list|ajax_list|add|edit|del|get|inlist)}/", controller.AccountController.Index).Methods("POST", "GET")
 		router.HandleFunc("/home/position/{action:(?:list)}/", controller.PositionController.Index).Methods("GET")
-		router.HandleFunc("/home/position/{action:(?:list|list_ajax|inlist|add|edit|del|get)}/", controller.PositionController.Index).Methods("POST","GET")
+		router.HandleFunc("/home/position/{action:(?:list|ajax_list|inlist|add|edit|del|get)}/", controller.PositionController.Index).Methods("POST","GET")
 
-		router.HandleFunc("/home/permission/{action:(?:list|list_ajax|inlist|add|edit|del|get)}/", controller.Permission.Index).Methods("POST","GET")
+		router.HandleFunc("/home/permission/{action:(?:list|ajax_list|inlist|add|edit|del|get)}/", controller.Permission.Index).Methods("POST","GET")
 
 
 		router.HandleFunc("/filemanager/{action:(?:dirtree|createdir|deletedir|movedir|copydir|renamedir|fileslist|upload|download|downloaddir|deletefile|movefile|copyfile|renamefile)}/", controller.Filemanager.Index).Methods("POST")

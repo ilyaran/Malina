@@ -103,7 +103,7 @@ func (this *ProductController) AjaxList(w http.ResponseWriter, r *http.Request) 
 	if category_id > 0{
 		categoryObj,ok := library.CATEGORY.TreeMap[category_id]
 		if ok {
-			categoryWhere = "category_id IN (" + categoryObj.Get_descendantIdsString() + ")"
+			categoryWhere = " category_id IN (" + categoryObj.Get_descendantIdsString() + ")"
 		}else {
 			library.VALIDATION.Status = 100
 			library.VALIDATION.Result["category"] = lang.T("category is not exist")

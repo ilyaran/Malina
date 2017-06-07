@@ -126,7 +126,7 @@ func (this *authController) Logout(w http.ResponseWriter, r *http.Request) {
 		library.SESSION.DeleteSession(library.SESSION.GetSessionObj().GetId(),w)
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 	}else {
-		http.Redirect(w, r, "/"+app.Uri_auth_login(), http.StatusTemporaryRedirect)
+		http.Redirect(w, r, app.Uri_auth_login(), http.StatusTemporaryRedirect)
 	}
 }
 
@@ -136,7 +136,7 @@ func (this *authController)  DeleteAccount(w http.ResponseWriter, r *http.Reques
 		model.AccountModel.Del(library.SESSION.SessionObj.AccountId)
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 	}else {
-		http.Redirect(w, r, "/"+app.Uri_auth_login(), http.StatusTemporaryRedirect)
+		http.Redirect(w, r, app.Uri_auth_login(), http.StatusTemporaryRedirect)
 	}
 }
 

@@ -204,7 +204,7 @@ var app = &App{
 
 	Uri_public_cart              : "public/cart/crud/",
 	Uri_public_product_list              : "public/product/list/",
-	Uri_public_product_list_ajax         : "public/product/list_ajax/",
+	Uri_public_product_list_ajax         : "public/product/ajax_list/",
 	Uri_public_product_get		     : "public/product/get/",
 
 	Uri_cart              : "home/cart/",

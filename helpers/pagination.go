@@ -15,7 +15,7 @@ package helper
 import "fmt"
 
 func PagingLinks(all, page, perPage int64, uri, attr,tag,class,classEl string) string {
-	if all == 0 {
+	if all < 1 {
 		return ""
 	}
 	var radius = int64(8) //app.Radius()

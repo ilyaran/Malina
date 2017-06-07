@@ -168,9 +168,9 @@ func (s *Session) GetIP(r *http.Request) string {
 		return ipProxy
 	}
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	/*if !IsIP(ip) {
+	if m, _ := regexp.MatchString("^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$", ip); !m {
 		return ""
-	}*/
+	}
 	return ip
 }
 func (s *Session) IsIP(ip string) (b bool) {

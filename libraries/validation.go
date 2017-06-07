@@ -145,29 +145,27 @@ func (s *Validation)ImgUrls(keyName string, r *http.Request)(string){
 	}
 	return ""
 }
-func (s *Validation)ImgIds(keyName string, isRequired bool,r *http.Request)([]int64){
+func (s *Validation)ImgIds(keyName string, isRequired bool,r *http.Request)[]int64{
 	var imgIds = r.FormValue(keyName)
 	if imgIds != ""{
 		var idsStr = strings.Split(imgIds,",") // 12,58,47,14, ...
-		var idsInt64 = []int64{}
 		var num = len(idsStr)
-		/*if num > app.Image_upload_num(){
-			num = app.Image_upload_num()
-		}*/
-		for n:=0; n < num; n++{
-			id, err := strconv.ParseInt(idsStr[n],10,64)
-			if err != nil{
-				s.Status = 100
-				s.Result[keyName] = fmt.Sprintf(lang.T("validation integer"),keyName)
-			}else {
-				idsInt64 = append(idsInt64,id)
+		if num > 0 {
+			var idsInt64= make([]int64, num)
+			for n := 0; n < num; n++ {
+				id, err := strconv.ParseInt(idsStr[n], 10, 64)
+				if err != nil {
+					s.Status = 100
+					s.Result[keyName] = fmt.Sprintf(lang.T("validation integer"), keyName)
+				} else {
+					idsInt64 = append(idsInt64, id)
+				}
 			}
+			return idsInt64
 		}
-		return idsInt64
 	}else if isRequired {
 		s.Status = 100
 		s.Result[keyName] = fmt.Sprintf(lang.T("validation required"),keyName)
-		return nil
 	}
 	return nil
 }

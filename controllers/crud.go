@@ -49,6 +49,14 @@ import (
 * 230 NOT exists(SELECT item_id
 * 250 result no rows
 
+200 - OK. Successful.
+400 - Bad request. Invalid request parameters.
+401 - Authorization required.
+403 - Not allowed.
+404 - Not found.
+420 - Rate limited.
+500 - Internal error. Contact support.
+
 **/
 
 type CrudController struct {
@@ -79,8 +87,8 @@ func (s *CrudController) hasPermission(dbtable, dbcolomun string, w http.Respons
 		//}
 	}
 
-	library.VALIDATION.Status = 80
-	library.VALIDATION.Result = map[string]string{"unauth": "no permission"}
+	library.VALIDATION.Status = 403
+	library.VALIDATION.Result = map[string]string{"unauth": "no permission not allowed"}
 	/*
 	if r.Method == "GET" {
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
