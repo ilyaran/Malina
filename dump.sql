@@ -14,6 +14,34 @@ SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
+--
+
+CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
+
+
+--
+-- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
+
+
+--
+-- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: 
+--
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
+
+
 SET search_path = public, pg_catalog;
 
 --
@@ -245,21 +273,23 @@ $_$;
 ALTER FUNCTION public.cart_update(character, bigint[], bigint[]) OWNER TO postgres;
 
 --
--- Name: product_add(bigint, character varying, character varying, character varying, numeric, numeric, boolean, character varying[]); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: product_add(bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION product_add(bigint, character varying, character varying, character varying, numeric, numeric, boolean, character varying[]) RETURNS bigint
+CREATE FUNCTION product_add(bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]) RETURNS bigint
     LANGUAGE plpgsql
     AS $_$
 DECLARE
   inCategoryId      ALIAS FOR $1;
   inTitle           ALIAS FOR $2;
   inDescription     ALIAS FOR $3;
-  inCode            ALIAS FOR $4;
-  inPrice           ALIAS FOR $5;
-  inPrice1          ALIAS FOR $6;
-  inEnable          ALIAS FOR $7;
-  inImgId           ALIAS FOR $8;
+  inShortDescription   ALIAS FOR $4;
+  inCode            ALIAS FOR $5;
+  inPrice           ALIAS FOR $6;
+  inPrice1          ALIAS FOR $7;
+  inEnable          ALIAS FOR $8;
+  inImgUrls           ALIAS FOR $9;
+  inParameterIds           ALIAS FOR $10;
   lastInsertId BIGINT;
 BEGIN
 
@@ -267,14 +297,16 @@ BEGIN
     product_category,
     product_title,
     product_description,
+    product_short_description,
     product_code,
     product_price,
     product_price1,
     product_enable,
     product_img,
+    product_parameter,
     search_vector)
   VALUES
-    (inCategoryId,inTitle, inDescription,inCode,inPrice,inPrice1,inEnable,inImgId,
+    (inCategoryId,inTitle, inDescription,inShortDescription,inCode,inPrice,inPrice1,inEnable,inImgUrls,inParameterIds,
      (setweight(to_tsvector(inTitle), 'A') || to_tsvector(inDescription)));
   SELECT INTO lastInsertId currval('product_product_id_seq');
 
@@ -285,13 +317,13 @@ END;
 $_$;
 
 
-ALTER FUNCTION public.product_add(bigint, character varying, character varying, character varying, numeric, numeric, boolean, character varying[]) OWNER TO postgres;
+ALTER FUNCTION public.product_add(bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]) OWNER TO postgres;
 
 --
--- Name: product_update(bigint, bigint, character varying, character varying, character varying, numeric, numeric, boolean, character varying[]); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: product_update(bigint, bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION product_update(bigint, bigint, character varying, character varying, character varying, numeric, numeric, boolean, character varying[]) RETURNS bigint
+CREATE FUNCTION product_update(bigint, bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]) RETURNS bigint
     LANGUAGE plpgsql
     AS $_$
 DECLARE
@@ -299,11 +331,13 @@ DECLARE
   inCategoryId      ALIAS FOR $2;
   inTitle           ALIAS FOR $3;
   inDescription     ALIAS FOR $4;
-  inCode            ALIAS FOR $5;
-  inPrice           ALIAS FOR $6;
-  inPrice1          ALIAS FOR $7;
-  inEnable          ALIAS FOR $8;
-  inImgId           ALIAS FOR $9;
+  inShortDescription ALIAS FOR $5;
+  inCode            ALIAS FOR $6;
+  inPrice           ALIAS FOR $7;
+  inPrice1          ALIAS FOR $8;
+  inEnable          ALIAS FOR $9;
+  inImgId           ALIAS FOR $10;
+  inParameterIds    ALIAS FOR $11;
 
 BEGIN
 
@@ -323,15 +357,17 @@ BEGIN
     product_category,
     product_title,
     product_description,
+    product_short_description,
     product_code,
     product_price,
     product_price1,
     product_enable,
     product_img,
+    product_parameter,
     product_updated,
     search_vector)
   =
-  (inCategoryId,inTitle, inDescription,inCode,inPrice,inPrice1,inEnable,inImgId,now(),
+  (inCategoryId,inTitle, inDescription,inShortDescription,inCode,inPrice,inPrice1,inEnable,inImgId,inParameterIds,now(),
    (setweight(to_tsvector(inTitle), 'A') || to_tsvector(inDescription)))
   WHERE product_id = inId;
 
@@ -351,7 +387,7 @@ END;
 $_$;
 
 
-ALTER FUNCTION public.product_update(bigint, bigint, character varying, character varying, character varying, numeric, numeric, boolean, character varying[]) OWNER TO postgres;
+ALTER FUNCTION public.product_update(bigint, bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]) OWNER TO postgres;
 
 SET default_tablespace = '';
 
@@ -364,7 +400,7 @@ SET default_with_oids = false;
 CREATE TABLE account (
     account_id bigint NOT NULL,
     account_email character varying(512),
-    account_login character varying(128),
+    account_nick character varying(128),
     account_phone character varying(64),
     account_token character varying(512),
     account_last_logged timestamp without time zone DEFAULT now() NOT NULL,
@@ -375,7 +411,13 @@ CREATE TABLE account (
     account_reason character varying(1024) DEFAULT ''::character varying NOT NULL,
     account_ban_duration bigint,
     account_created timestamp without time zone DEFAULT now() NOT NULL,
-    account_role bigint
+    account_role bigint,
+    account_provider character varying(128),
+    account_skype character varying(128),
+    account_first_name character varying(128),
+    account_last_name character varying(128),
+    account_state bigint,
+    account_img character varying(255)
 );
 
 
@@ -400,6 +442,49 @@ ALTER TABLE account_account_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE account_account_id_seq OWNED BY account.account_id;
+
+
+--
+-- Name: balance; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE balance (
+    balance_id bigint NOT NULL,
+    balance_account bigint,
+    balance_in numeric DEFAULT 0.00 NOT NULL,
+    balance_out numeric DEFAULT 0.00 NOT NULL,
+    balance_comment character varying(1024) DEFAULT ''::character varying,
+    balance_created timestamp without time zone DEFAULT now() NOT NULL,
+    balance_updated timestamp without time zone DEFAULT now() NOT NULL,
+    balance_data text,
+    balance_in_from bigint,
+    balance_out_to bigint,
+    balance_operation_code bigint,
+    balance_status bigint
+);
+
+
+ALTER TABLE balance OWNER TO postgres;
+
+--
+-- Name: balance_balance_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE balance_balance_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE balance_balance_id_seq OWNER TO postgres;
+
+--
+-- Name: balance_balance_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE balance_balance_id_seq OWNED BY balance.balance_id;
 
 
 --
@@ -698,6 +783,13 @@ ALTER TABLE ONLY account ALTER COLUMN account_id SET DEFAULT nextval('account_ac
 
 
 --
+-- Name: balance balance_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY balance ALTER COLUMN balance_id SET DEFAULT nextval('balance_balance_id_seq'::regclass);
+
+
+--
 -- Name: category category_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -746,6 +838,12 @@ ALTER TABLE ONLY role ALTER COLUMN role_id SET DEFAULT nextval('role_role_id_seq
 
 
 --
+-- Data for Name: balance; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+
+
+--
 -- Data for Name: cart; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -773,6 +871,8 @@ INSERT INTO category VALUES (13, NULL, 'Displays', '&lt;p&gt;Letter | 15 Novem
 	&lt;li&gt;Jürgen Ruland&lt;/li&gt;
 &lt;/ul&gt;
 ', 150, '2017-11-16 13:03:38.596132', '2017-11-16 13:03:38.596132', 0, NULL, NULL, true, '');
+INSERT INTO category VALUES (1, NULL, 'Computers', '<p>Comps</p>
+', 100, '2017-10-31 14:36:34.550983', '2017-10-31 14:36:34.550983', 28, '{8394337.01.prod.jpg}', '{1,7,20}', true, '');
 INSERT INTO category VALUES (15, NULL, 'Network ', '', 170, '2017-11-16 13:20:56.537135', '2017-11-16 13:20:56.537135', 0, NULL, NULL, true, '');
 INSERT INTO category VALUES (2, 1, 'Laptops', '<p>News and Views&nbsp;|&nbsp;15 November 2017</p>
 
@@ -784,8 +884,6 @@ INSERT INTO category VALUES (2, 1, 'Laptops', '<p>News and Views&nbsp;|&nbsp;15 
 	<li>Michelle Elliott</li>
 </ul>
 ', 100, '2017-10-31 14:36:34.550983', '2017-10-31 14:36:34.550983', 2, '{Asus-VS248H-P-24-LED-LCD-Monitor-16-9-2-ms-P13729418.jpg,1e43d48s-960.jpg}', NULL, true, '');
-INSERT INTO category VALUES (1, NULL, 'Computers', '<p>Comps</p>
-', 100, '2017-10-31 14:36:34.550983', '2017-10-31 14:36:34.550983', 25, '{8394337.01.prod.jpg}', NULL, true, '');
 INSERT INTO category VALUES (16, NULL, 'WiFi modules cc vv', '', 120, '2017-11-19 18:56:41.084862', '2017-11-19 18:56:41.084862', 0, '{"images (45).jpg","images (3).jpg"}', NULL, true, '');
 
 
@@ -800,8 +898,6 @@ INSERT INTO category VALUES (16, NULL, 'WiFi modules cc vv', '', 120, '2017-11-1
 --
 
 INSERT INTO parameter VALUES (3, 'Graphic', NULL, 100, '', '', '2017-11-13 06:44:44.790707', '2017-11-13 06:44:44.790707', true);
-INSERT INTO parameter VALUES (5, '8 thread', 4, 100, NULL, '', '2017-11-13 07:49:28.44342', '2017-11-13 07:49:28.44342', true);
-INSERT INTO parameter VALUES (6, '16 threads', 4, 110, NULL, '', '2017-11-13 07:51:58.725741', '2017-11-13 07:51:58.725741', true);
 INSERT INTO parameter VALUES (7, 'Display', NULL, 120, '', '', '2017-11-13 17:38:47.50543', '2017-11-13 17:38:47.50543', true);
 INSERT INTO parameter VALUES (8, 'Discrette', 3, 100, '', '', '2017-11-13 21:07:30.633986', '2017-11-13 21:07:30.633986', true);
 INSERT INTO parameter VALUES (11, 'retina', 7, 100, '', '', '2017-11-13 21:57:12.411322', '2017-11-13 21:57:12.411322', true);
@@ -811,25 +907,15 @@ INSERT INTO parameter VALUES (19, 'MainBoards', NULL, 200, '', '', '2017-11-19 1
 INSERT INTO parameter VALUES (21, '111MainBoards', NULL, 210, '', '', '2017-11-19 15:52:59.597356', '2017-11-19 15:52:59.597356', true);
 INSERT INTO parameter VALUES (24, '333 sdasd dfsdfsdf', NULL, 230, '', '', '2017-11-19 15:56:18.47885', '2017-11-19 15:56:18.47885', true);
 INSERT INTO parameter VALUES (25, 'Integrated', 3, 90, '', '', '2017-11-19 18:38:16.143934', '2017-11-19 18:38:16.143934', true);
-INSERT INTO parameter VALUES (1, 'Processors gg', NULL, 50, 'tgdrtgdrth fd', '', '2017-10-31 14:41:27.175606', '2017-10-31 14:41:27.175606', true);
-INSERT INTO parameter VALUES (2, '4-Core', 1, 60, '&lt;input type=&#34;checkbox&#34;&gt;', '', '2017-10-31 14:41:27.175606', '2017-10-31 14:41:27.175606', true);
-INSERT INTO parameter VALUES (4, 'Threads', 2, 70, 'gdrts drfser', '', '2017-11-13 07:48:50.087554', '2017-11-13 07:48:50.087554', true);
 INSERT INTO parameter VALUES (10, '2Gb', 9, 100, '', '', '2017-11-13 21:37:13.886115', '2017-11-13 21:37:13.886115', true);
 INSERT INTO parameter VALUES (13, '4Gb', 9, 110, '', '', '2017-11-14 11:05:44.317195', '2017-11-14 11:05:44.317195', true);
 INSERT INTO parameter VALUES (9, 'GRAM', 8, 100, '', '', '2017-11-13 21:34:45.601092', '2017-11-13 21:34:45.601092', true);
-INSERT INTO parameter VALUES (16, '6 cores', 1, 110, '<p>Letter&nbsp;|&nbsp;08 November 2017</p>
-
-<h3><a href="https://www.nature.com/articles/nature24476"><img alt="" src="https://media.springernature.com/w75h75/nature-static/assets/v1/image-assets/nature24476-f1.jpg" style="height:75px; width:75px" />Parallel palaeogenomic transects reveal complex genetic history of early European farmers</a></h3>
-
-<p>In European Neolithic populations, the arrival of farmers prompted admixture with local hunter-gatherers over many&hellip;&nbsp;show more</p>
-
-<ul>
-	<li>Mark Lipson</li>
-	<li>,&nbsp;Anna Sz&eacute;cs&eacute;nyi-Nagy</li>
-	<li><a href="javascript:;" title="Show all 57 authors">[&hellip;]</a></li>
-	<li>David Reich</li>
-</ul>
-', '', '2017-11-16 13:39:28.200614', '2017-11-16 13:39:28.200614', true);
+INSERT INTO parameter VALUES (1, 'Processors gg', NULL, 50, 'tgdrtgdrth fd', '', '2017-10-31 14:41:27.175606', '2017-10-31 14:41:27.175606', true);
+INSERT INTO parameter VALUES (4, 'Threads', 2, 70, 'gdrts drfser', '', '2017-11-13 07:48:50.087554', '2017-11-13 07:48:50.087554', true);
+INSERT INTO parameter VALUES (16, '6 cores', 1, 110, '<input type="checkbox">', '', '2017-11-16 13:39:28.200614', '2017-11-16 13:39:28.200614', true);
+INSERT INTO parameter VALUES (2, '4-Core', 1, 60, '<input type="checkbox">', '', '2017-10-31 14:41:27.175606', '2017-10-31 14:41:27.175606', true);
+INSERT INTO parameter VALUES (6, '16 threads', 4, 110, '<input type="checkbox">', '', '2017-11-13 07:51:58.725741', '2017-11-13 07:51:58.725741', true);
+INSERT INTO parameter VALUES (5, '8 thread', 4, 100, '<input type="checkbox">', '', '2017-11-13 07:49:28.44342', '2017-11-13 07:49:28.44342', true);
 
 
 --
@@ -860,6 +946,9 @@ INSERT INTO product VALUES (34, 'zdfdfgfdgdfg', 1, NULL, '{Asus-VS248H-P-24-LED-
 </ul>
 ', 345.00, 343.00, 0.00, 0, 0, 0, NULL, '2017-11-16 12:53:03.521017', '2017-11-16 12:53:17.776602', true, '''15'':6 ''2017'':8 ''affect'':29 ''analys'':17 ''bacteria'':16 ''blood'':25 ''cc'':2A ''david'':37 ''dietari'':22 ''high'':12 ''high-pressur'':11 ''increas'':24 ''mice'':19 ''microb'':33 ''microbiota'':9 ''monitor'':1A ''news'':3 ''novemb'':7 ''part'':27 ''pressur'':13,26 ''relman'':39 ''salt'':23 ''show'':35 ''situat'':14 ''suggest'':20 ''view'':5', 0, '1', '');
 INSERT INTO product VALUES (32, 'sdfzsdf', 4, NULL, '{"images (10).jpg"}', '112 sdfszd zsdsd', '', 256.36, 254.28, 0.00, 0, 0, 0, NULL, '2017-11-15 20:40:02.331731', '2017-11-15 21:14:07.778512', true, '''112'':1A ''sdfszd'':2A ''zsdsd'':3A', 0, '1', '');
+INSERT INTO product VALUES (36, '', 1, '{6,16}', '{"images (46).jpg","images (3).jpg"}', 'ftyrtyfr rtdrt', '', 0.00, 0.00, 0.00, 0, 0, 0, NULL, '2017-12-02 18:22:49.97726', '2017-12-02 18:22:49.97726', true, '''ftyrtyfr'':1A ''rtdrt'':2A', 0, '1', '');
+INSERT INTO product VALUES (37, '', 1, '{6,13,12}', '{"images (44).jpg","images (46).jpg"}', 'ytutut', '', 0.00, 0.00, 0.00, 0, 0, 0, NULL, '2017-12-02 18:39:13.618824', '2017-12-02 18:39:13.618824', true, '''ytutut'':1A', 0, '1', '');
+INSERT INTO product VALUES (38, '', 1, NULL, '{"images (44).jpg","images (46).jpg"}', 'ytutut', '', 0.00, 0.00, 0.00, 0, 0, 0, NULL, '2017-12-02 18:39:23.373107', '2017-12-02 18:39:23.373107', true, '''ytutut'':1A', 0, '1', '');
 
 
 --
@@ -872,7 +961,7 @@ INSERT INTO product VALUES (32, 'sdfzsdf', 4, NULL, '{"images (10).jpg"}', '112 
 -- Data for Name: session; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO session VALUES ('094ad34fdb497994d0c3b535d1c18627e77a2e98da69edb6a85874b0751ccef2', NULL, 1511110208, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36', '', NULL, NULL, NULL, NULL, '', NULL);
+INSERT INTO session VALUES ('b1a66c26-b0bb-4023-98d6-ff7df5a23884_c3e6f89ef1dad8155faab63b7f658b052bd12d4aabbb3b33e6c694d0edcd76db', NULL, 1512396727, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36', '::1', NULL, NULL, NULL, NULL, '', NULL);
 
 
 --
@@ -880,6 +969,13 @@ INSERT INTO session VALUES ('094ad34fdb497994d0c3b535d1c18627e77a2e98da69edb6a85
 --
 
 SELECT pg_catalog.setval('account_account_id_seq', 1, false);
+
+
+--
+-- Name: balance_balance_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('balance_balance_id_seq', 1, false);
 
 
 --
@@ -914,7 +1010,7 @@ SELECT pg_catalog.setval('permission_permission_id_seq', 3, true);
 -- Name: product_product_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('product_product_id_seq', 35, true);
+SELECT pg_catalog.setval('product_product_id_seq', 38, true);
 
 
 --
@@ -930,6 +1026,14 @@ SELECT pg_catalog.setval('role_role_id_seq', 1, false);
 
 ALTER TABLE ONLY account
     ADD CONSTRAINT account_pkey PRIMARY KEY (account_id);
+
+
+--
+-- Name: balance balance_balance_id_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY balance
+    ADD CONSTRAINT balance_balance_id_pk PRIMARY KEY (balance_id);
 
 
 --
@@ -1006,7 +1110,7 @@ CREATE UNIQUE INDEX account_account_id_uindex ON account USING btree (account_id
 -- Name: account_account_login_uindex; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX account_account_login_uindex ON account USING btree (account_login);
+CREATE UNIQUE INDEX account_account_login_uindex ON account USING btree (account_nick);
 
 
 --
@@ -1021,6 +1125,13 @@ CREATE UNIQUE INDEX account_account_phone_uindex ON account USING btree (account
 --
 
 CREATE UNIQUE INDEX account_account_token_uindex ON account USING btree (account_token);
+
+
+--
+-- Name: balance_balance_id_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX balance_balance_id_uindex ON balance USING btree (balance_id);
 
 
 --
@@ -1117,7 +1228,7 @@ ALTER TABLE ONLY session
 --
 
 ALTER TABLE ONLY session
-    ADD CONSTRAINT session_account_account_login_fk FOREIGN KEY (session_login) REFERENCES account(account_login) ON UPDATE CASCADE ON DELETE SET NULL;
+    ADD CONSTRAINT session_account_account_login_fk FOREIGN KEY (session_login) REFERENCES account(account_nick) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --
