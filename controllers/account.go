@@ -1,277 +1,413 @@
-/**
- * Account controller class.  Malina eCommerce application
- *
- *
- * @author		John Aran Ilyas Aranzhanovich Toxanbayev)
- * @version		1.0.0
- * @based on
- * @email      il.aranov@gmail.com
- * @link
- * @github      https://github.com/ilyaran/Malina
- * @license	MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
- */
-package controller
+package controllers
 
 import (
 	"net/http"
 	"strconv"
-	"github.com/ilyaran/Malina/views/account"
-	"github.com/ilyaran/Malina/helpers"
-	"github.com/ilyaran/Malina/models"
-	"github.com/ilyaran/Malina/config"
-	"fmt"
 	"encoding/json"
-	"github.com/ilyaran/Malina/language"
+	"github.com/ilyaran/Malina/views"
+	"github.com/ilyaran/Malina/models"
+	"github.com/ilyaran/Malina/filters"
+	"github.com/ilyaran/Malina/app"
+
+	"github.com/ilyaran/Malina/lang"
+	"github.com/ilyaran/Malina/berry"
 	"github.com/ilyaran/Malina/entity"
-	"html/template"
 	"github.com/ilyaran/Malina/libraries"
+	"database/sql"
+	"github.com/ilyaran/Malina/caching"
+	"github.com/ilyaran/Malina/dao"
+
+	"github.com/ilyaran/Malina/views/publicView"
 )
 
-var AccountController = &accountController{&CrudController{}}
+var AccountController *Account
+func AccountControllerInit()string{
 
-type accountController struct{ crud *CrudController }
 
-func (this *accountController) Index(w http.ResponseWriter, r *http.Request) {
-	this.crud.hasPermission("account", "account_id", w, r)
-	if library.VALIDATION.Status == 0 {
+	AccountController = &Account{base:&base{dbtable:"account", item:&entity.Account{},}}
 
-		model.AccountModel.Query = ``
-		model.AccountModel.Where = ``
-		model.AccountModel.All = 0
+	//helpers.GenerateControllerFields(AccountController.base.dbtable,AccountController.base.item)
 
-		switch this.crud.action {
-		case "list_ajax":
-			if this.AjaxList(w, r) {
-				return
+	// model init
+	AccountController.model = models.Account{}
+	// end model init
+
+	// set SQL fields
+	for _,v := range app.AccountSelectSqlFieldsList {
+		AccountController.base.selectSqlFieldsDefault += ","+v
+	}
+	AccountController.base.selectSqlFieldsDefault = AccountController.base.selectSqlFieldsDefault[1:]
+
+
+
+	// orders init
+	AccountController.base.orderList =[][2]string{
+		{"ORDER BY account_created DESC",lang.T("created")+`&darr;`},
+		{"ORDER BY account_created ASC",lang.T("created")+`&uarr;`},
+		{"ORDER BY account_updated DESC",lang.T("updated")+`&darr;`},
+		{"ORDER BY account_updated ASC",lang.T("updated")+`&uarr;`},
+	}
+
+	if AccountController.base.orderList==nil || len(AccountController.base.orderList) < 0{
+		panic("order list is not init")
+	}
+	AccountController.base.orderListLength = int64(len(AccountController.base.orderList))
+	// end orders init
+
+	AccountController.base.searchSqlTemplate=` account_nick LIKE '%~%'
+												OR account_email LIKE '%~%'
+												OR account_first_name LIKE '%~%'
+												OR account_skype LIKE '%~%'
+												OR account_last_name LIKE '%~%'																							OR account_email LIKE '%~%'
+												OR account_trade LIKE '%~%'
+												OR account_steam LIKE '%~%'
+												OR account_phone LIKE '%~%' `
+
+	AccountController.base.inlistSqlFields = map[string]byte{
+		"account_first_name"     :'s',
+		"account_ban"    :'b',
+	}
+
+	// view init
+	AccountController.view = views.Account{}
+	for k,_ := range AccountController.base.inlistSqlFields{
+		AccountController.view.InlistFields += `<input class="inlist_fields" type="hidden" value="`+k+`">`
+	}
+	for k,v := range AccountController.base.orderList{
+		AccountController.view.OrderSelectOptions += `<option value="`+strconv.Itoa(k)+`">`+v[1]+`</option>`
+	}
+	AccountController.viewPublic=publicView.Account{}
+	// end view init
+
+	return AccountController.base.selectSqlFieldsDefault
+}
+
+type Account struct {
+	ArraySelectSqlFields []string
+	base     		*base
+	model			models.Account
+	view            views.Account
+	viewPublic publicView.Account
+}
+
+func(s *Account)Index(malina *berry.Malina,department, device string, w http.ResponseWriter, r *http.Request){
+	malina.Controller = s
+	malina.Department = department
+	malina.Device = device
+	malina.TableSql = s.base.dbtable
+	s.base.index(malina,w,r,"")
+}
+
+func(s *Account)GetList(malina *berry.Malina, w http.ResponseWriter, r *http.Request, condition string){
+
+
+	if malina.Status > 0 {
+		return
+	}
+
+	if malina.Department == "public"{
+		models.CrudGeneral.WhereAnd(malina,"account_enable =","TRUE")
+	}
+
+	s.base.getList(malina,w,r)
+	//fmt.Println(malina.Order_bySql)
+	// if the user agent is a browser
+	if malina.Device == "browser" {
+		// if via ajax
+		if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+
+			//helpers.SetAjaxHeader(w)
+
+			//if public
+			if malina.Department == "public"{
+				//s.view.Paging = s.base.paging(malina,"","")
+				//w.Write([]byte(public.AccountView.Listing()))
+
+			// if home admin
+			}else {
+				malina.Paging = s.base.paging(malina,"","")
+				w.Write([]byte(s.view.Listing(malina)))
 			}
-		case "inlist":
-			this.Inlist(w, r)
-		case "get":
-			if this.Get(w, r) {
-				return
+
+		// if non ajax req
+		}else {
+			//if public
+			if malina.Department == "public"{
+				//public.AccountView.Paging = s.base.paging(malina,app.Url_public_account_list)
+				//public.AccountView.Index()
+			// if home admin
+			}else {
+				malina.Paging = s.base.paging(malina,"",app.Url_home_account_list)
+				s.view.Index(malina,w)
 			}
-		case "add":
-			this.FormHandler('a', w, r)
-		case "edit":
-			this.FormHandler('e', w, r)
-		case "del":
-			this.Del(w, r)
-		default:
-			this.List(w, r); return // "list"
 		}
 
+	// if the user agent is a mobile or another device
+	}else {
+		out, _ := json.Marshal(malina.List)
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.Write(out)
 	}
-	helper.SetAjaxHeaders(w)
-	out, _ := json.Marshal(library.VALIDATION)
-	fmt.Fprintf(w, string(out))
+
 }
 
-func (this *accountController) List(w http.ResponseWriter, r *http.Request) {
-	page, pageStr := this.crud.getList(false, w, r)
-	order := "account_last_logged DESC"
-	if library.VALIDATION.Status == 0 {
 
-		accountView.AccountViewObj.AccountList = model.AccountModel.GetList("", pageStr, strconv.FormatInt(app.Per_page(), 10), order, library.POSITION.TreeMap)
-		accountView.AccountViewObj.Paging = helper.PagingLinks(model.AccountModel.All, page, app.Per_page(), app.Uri_account()+"list/?page=%d", "href", "a", "", "")
+func (s *Account) FormHandler(malina *berry.Malina,action byte,w http.ResponseWriter,r *http.Request) {
+	if malina.Department=="cabinet"{
+		s.UpdateAccountColumn(malina,w, r)
+		return
+	}
 
-		accountView.AccountViewObj.Index()
+
+	if malina.Status > 0 {
+		return
+	}
+
+	var res int64
+	if action == 'a' {
+		//res = s.model.Upsert(action,form.imgUrls,form.category_id,form.title,form.description,form.code,form.price,form.price1,form.enable)
+	} else {
+		//res = s.model.Upsert(action,form.imgUrls,malina.IdInt64,form.category_id,form.title,form.description,form.code,form.price,form.price1,form.enable)
+	}
+	if res > 0 {
+		malina.Status = http.StatusOK
+		models.CrudGeneral.WhereAnd(malina, "account_id =","$1")
+		malina.SelectSql=s.base.selectSqlFieldsDefault
+		if action == 'a'{
+			models.CrudGeneral.GetItem(malina,s.base.item,"",res)
+		} else {
+			models.CrudGeneral.GetItem(malina,s.base.item,"",malina.IdInt64)
+		}
+		malina.Result["item"] =  malina.Item
+	} else {
+		malina.Status = http.StatusInternalServerError
+		malina.Result["error"] = lang.T(`server error`)
 	}
 }
 
-func (this *accountController) AjaxList(w http.ResponseWriter, r *http.Request) bool {
-	page, pageStr, per_page, per_pageStr, search, order_by := this.crud.getAjaxList(false, w, r)
-	var order = "account_last_logged DESC"
-	switch order_by {
-	case 2:
-		order = "account_last_logged ASC"
-	case 3:
-		order = "account_updated DESC"
-	case 4:
-		order = "account_updated ASC"
-	case 5:
-		order = "account_created ASC"
-	case 6:
-		order = "account_created DESC"
+
+
+func (s *Account) ResultHandler(malina *berry.Malina,args ... interface{}){
+
+}
+
+func(s *Account)Default(malina *berry.Malina, w http.ResponseWriter, r *http.Request){
+
+	if malina.Action == "form" {
+		s.AccountForm(malina,w, r)
+		return
+	}
+	if malina.Action == "phone" {
+
+		return
+	}
+	if malina.Action == "img" {
+		s.AccountImg(malina,w, r)
+		return
 	}
 
-	if library.VALIDATION.Status == 0 {
 
-		itemList := model.AccountModel.GetList(search, pageStr, per_pageStr, order, library.POSITION.TreeMap)
-		paging := helper.PagingLinks(model.AccountModel.All, page, per_page, "%d", "data-page", "span", "", `class="paging"`)
 
-		helper.SetAjaxHeaders(w)
+	s.viewPublic.Index(malina,w)
+}
 
-		w.Write([]byte(accountView.Listing(itemList, paging)))
+
+func (s *Account) AccountForm(malina *berry.Malina,w http.ResponseWriter, r *http.Request) {
+
+	if r.Method=="GET"{
+
+
+	}else if r.Method=="POST"{
+
+		first_name :=filters.IsValidText(malina,false, "first_name", false, 1, 64, `^[а-яА-Я\sa-zA-Z0-9_\-]+$`, `позволительно только следующие символы: а-я А-Я a-z A-Z 0-9 _ - и пробел`, r)
+		if first_name != `` {malina.CurrentAccount.FirstName=first_name}
+
+		last_name:=filters.IsValidText(malina,false, "last_name", false, 1, 64, `^[а-яА-Я\sa-zA-Z0-9_\-]+$`, `позволительно только следующие символы: а-я А-Я a-z A-Z 0-9 _ - и пробел`, r)
+		if last_name != `` {malina.CurrentAccount.LastName=last_name}
+
+		nick:=filters.IsValidText(malina,false, "nick", true, 1, 8, `^[a-zA-Z0-9]+$`, `позволительно только следующие символы: a-z A-Z 0-9`, r)
+		if nick!=`` {
+			if malina.CurrentAccount.Nick != nick {
+				if AccountController.model.CheckDetail(`account_nick = $1`, nick) {
+					malina.Status = 404
+					malina.Result["nick"] = "nick " + lang.T("exists allready")
+				} else {
+					malina.CurrentAccount.Nick = nick
+				}
+			}
+		}
+		state, _ :=filters.IsUint(malina,false, "state", 3, r)
+		if state>0 {
+			if _,ok := caching.StatesMap[state]; ok {
+				malina.CurrentAccount.State = state
+			}else {
+				malina.Status = 404
+				malina.Result["state"] = "state "+lang.T("not found")
+			}
+		}else {
+			malina.CurrentAccount.State = 0
+		}
+
+		/*city :=filters.IsValidText(malina,false, "city", false, 1, 64, `^[а-яА-Я\sa-zA-Z0-9_\-]+$`, `позволительно только следующие символы: а-я А-Я a-z A-Z 0-9 _ - и пробел`, r)
+		if city != `` { malina.CurrentAccount.City=city }*/
+
+		var skype =filters.IsValidText(malina,false, "skype", true, 1, 8, `^[a-zA-Z0-9]+$`, `позволительно только следующие символы: a-z A-Z 0-9`, r)
+		if skype != `` {
+			if malina.CurrentAccount.Skype != skype {
+				if AccountController.model.CheckDetail(`account_skype = $1`, skype) {
+					malina.Status = 404
+					malina.Result["skype"] = "skype " + lang.T("exists allready")
+				} else {
+					malina.CurrentAccount.Skype = skype
+				}
+			}
+		}
+		var email =filters.IsEmail(malina,true ,"email",r)
+		if email != `` {
+			if malina.CurrentAccount.Email != email{
+				if AccountController.model.CheckDetail(`account_email = $1`, email) {
+					malina.Status = 404
+					malina.Result["email"] = "email " + lang.T("exists allready")
+				}else {
+					malina.CurrentAccount.Email = email
+				}
+			}
+		}
+
+		/*var phone =filters.IsValidText(malina,false, "phone", true, 5, 16, `^[\+]?[0-9]+$`, `позволительно только : +77058436633`, r)
+		if phone != `` {
+			if malina.CurrentAccount.Phone != phone {
+				model.AuthModel.CheckDetails(`account_phone = $1`, phone)
+				if model.AuthModel.All > 0 {
+					malina.Status = 404
+					malina.Result["phone"] = "phone " + lang.T("exists allready")
+				} else {
+					malina.CurrentAccount.Phone = phone
+				}
+			}
+		}*/
+
+		var oldPass =filters.PasswordValid(malina,false, "old_password", false, false, false, r)
+		if oldPass != `` {
+			if malina.CurrentAccount.Password != dao.AuthDao.Cryptcode(oldPass){
+				malina.Status = 404
+				malina.Result["old_password"] = "старый пароль не правильный"
+			}
+			var new_pass =filters.PasswordValid(malina,false, "new_password", false, false, false, r)
+
+			filters.ConfirmPasswordValid(malina,"confirm_new_password",new_pass, r)
+
+			if malina.Status == 0 {
+				malina.CurrentAccount.Password = dao.AuthDao.Cryptcode(new_pass)
+			}
+		}
+
+		if r.FormValue("sex") == "male" {
+			malina.CurrentAccount.Sex=false
+		}else {
+			malina.CurrentAccount.Sex=true
+		}
+
+		if malina.Status == 0 {
+			if AccountController.model.EditByObject(malina.CurrentAccount) > 0 {
+				//msg="Успешно обновлен"
+			} else {
+				//msg="ошибка сервера"
+			}
+			/*malina.Status = 200
+			malina.Result["success"] = msg*/
+		}
+	}
+	//s.viewPublic.AccountForm(malina,msg,w)
+
+}
+
+
+func (s *Account) UpdateAccountColumn(malina *berry.Malina,w http.ResponseWriter, r *http.Request){
+	key := r.FormValue("key")
+	value := filters.IsValidText(malina,true, "value", true, 1, 128, `^[a-zA-Z0-9_\-]+$`, `позволительно только следующие символы: a-z A-Z 0-9 _ -`, r)
+	if malina.Status == 0 {
+		if key == "trade"{
+			s.UpdateColumn(malina,"account_trade",value)
+		}
+	}
+}
+
+func (s *Account) UpdateColumn(malina *berry.Malina,columnName string,value interface{}) bool {
+
+	if models.CrudGeneral.Update(`
+			UPDATE account SET `+columnName+`= $1 WHERE account_id = $2
+		`,value, malina.CurrentAccount.Id)>0{
+		malina.Status=200
+		malina.Result["ok"]="ok"
 		return true
 	}
+	malina.Status=500
+	malina.Result["error"]=lang.T("server error")
 	return false
 }
 
-func (this *accountController) Get(w http.ResponseWriter, r *http.Request) bool {
-	idInt64, _ := this.crud.get(w, r)
-	if library.VALIDATION.Status == 0 {
-		var accountObj = model.AccountModel.Get(idInt64)
-		if accountObj != nil {
-			accountObj.SetPassword("")
 
-			helper.SetAjaxHeaders(w)
+func (s *Account) AccountImg(malina *berry.Malina,w http.ResponseWriter, r *http.Request){
 
-			out, _ := json.Marshal(accountObj)
-			fmt.Fprintf(w, string(out))
-			return true
-		} else {
-			library.VALIDATION.Status = 100
-			library.VALIDATION.Result["item_id"] = lang.T("not found")
-		}
-	}
-	return false
-}
-func (this *accountController) FormHandler(action byte, w http.ResponseWriter, r *http.Request) {
-	var idInt64 int64
-	var account *entity.Account = nil
-	if action == 'e' {
-		idInt64, _ = this.crud.edit(w, r)
-		account = model.AccountModel.Get(idInt64)
-		if account == nil {
-			library.VALIDATION.Status = 100
-			library.VALIDATION.Result["item_id"] = lang.T("account not found")
-		}
-	}
-	var exec = []interface{}{}
-	var q = ``
-	var qvalues = ``
-	var n int = 1
+	avatar,_ := libraries.UploadLib.Img(malina,"avatar",w,r)
+	/*if avatar == "" {
+		malina.Status = 200
+		malina.Result["account_img"] = app.Url_no_avatar
 
-	position, _ := library.VALIDATION.IsInt64(false, "position", 10, r)
-	if position > 0 {
-		if _, ok := library.POSITION.TreeMap[position]; ok {
-			q += `,account_position`
-			qvalues += `,$` + strconv.Itoa(n)
-			exec = append(exec, position)
-			n++
-		} else {
-			library.VALIDATION.Status = 100
-			library.VALIDATION.Result["position"] = lang.T("position is not exist")
-		}
+		return
+	}*/
+	if malina.Status > 0 {
+		return
 	}
 
-	var nick = library.VALIDATION.IsValidText(false, "nick", true, 1, 255, `^[a-z0-9-_]+$`, ` a-z 0-9 - _ `, r)
-	if nick != `` {
-		model.AccountModel.Where = ` account_nick = $1`
-		if model.AccountModel.CheckDetail([]interface{}{nick}) && (account != nil && account.Nick != nick) {
-			library.VALIDATION.Status = 100
-			library.VALIDATION.Result["nick"] = lang.T("exists allready")
-		} else {
-			q += `,account_nick`
-			qvalues += `,$` + strconv.Itoa(n)
-			exec = append(exec, nick)
-			n++
-		}
+	sqlAvatar:=sql.NullString{String:avatar,Valid:true}
+	if avatar=="null" || avatar==""{sqlAvatar.Valid=false}
+	var oldAvatar string
+	err := models.CrudGeneral.DB.QueryRow(`
+			UPDATE "account" x
+			SET    "account_img" = $1
+			FROM  (SELECT account_id, "account_img" FROM "account" WHERE account_id = $2 FOR UPDATE) y
+			WHERE  x.account_id = y.account_id
+			RETURNING COALESCE(y."account_img",'')
+		`,sqlAvatar,malina.CurrentAccount.Id).Scan(&oldAvatar)
+	if err==sql.ErrNoRows{
+		//panic(err)
+		malina.Status = 404
+		malina.Result["error"] = lang.T("not found")
+		return
 	}
-	var email = library.VALIDATION.IsEmail(false, r)
-	if email != `` {
-		model.AccountModel.Where = ` account_email = $1`
-		if model.AccountModel.CheckDetail([]interface{}{email}) && (account != nil && account.Email != email) {
-			library.VALIDATION.Status = 100
-			library.VALIDATION.Result["email"] = lang.T("exists allready")
-		} else {
-			q += `,account_email`
-			qvalues += `,$` + strconv.Itoa(n)
-			exec = append(exec, email)
-			n++
-		}
+	if err!=nil{
+		panic(err)
+		malina.Status = 500
+		malina.Result["error"] = lang.T("server error")
+		return
+	}
+	libraries.UploadLib.DelFile(app.Root_path+"/"+app.Path_assets_uploads, oldAvatar)
+
+	malina.Status = 200
+	if avatar=="null" || avatar==""{
+		malina.Result["account_img"] = app.Url_no_image
+	}else{
+		malina.Result["account_img"] = app.Url_assets_uploads + avatar
 	}
 
-	var phone = library.VALIDATION.IsPhone(false, "phone", r)
-	if phone != `` {
-		model.AccountModel.Where = ` account_phone = $1`
-		if model.AccountModel.CheckDetail([]interface{}{phone}) && (account != nil && account.Phone != phone) {
-			library.VALIDATION.Status = 100
-			library.VALIDATION.Result["phone"] = lang.T("exists allready")
-		} else {
-			q += `,account_phone`
-			qvalues += `,$` + strconv.Itoa(n)
-			exec = append(exec, phone)
-			n++
-		}
-
-	}
-
-	if email+nick+phone == "" {
-		library.VALIDATION.Status = 130
-		library.VALIDATION.Result["error"] = lang.T("email or nick or phone required")
-	}
-
-
-	if library.VALIDATION.CheckBox("ban", r) {
-		exec = append(exec, true)
-	}else {
-		exec = append(exec, false)
-	}
-	q += `,account_ban`
-	qvalues += `,$` + strconv.Itoa(n)
-	n++
-
-	var ban_reason = template.HTMLEscapeString(r.FormValue("ban_reason")) //library.Validation.IsValidText(false,"ban_reason",false,255,`[\w\s-_]+`,`words, spaces, underscore`,r)
-	if ban_reason != `` {
-		q += `,account_ban_reason`
-		qvalues += `,$` + strconv.Itoa(n)
-		exec = append(exec, ban_reason)
-		n++
-	}
-
-	var newpass string
-	if action == 'a' {
-		newpass = library.VALIDATION.PasswordValid(true, "newpass", false, false, false, r)
-	} else {
-		newpass = library.VALIDATION.PasswordValid(false, "newpass", false, false, false, r)
-	}
-	if newpass != `` {
-		q += `,account_password`
-		qvalues += `,$` + strconv.Itoa(n)
-		exec = append(exec, library.SESSION.Cryptcode(newpass))
-		n++
-	}
-
-	if library.VALIDATION.Status == 0 && q != `` {
-		var res int64
-		if action == 'e' {
-			// edit
-			exec = append(exec, idInt64)
-			res = model.Crud.Update(`
-			UPDATE account SET
-			(`+ q[1:]+ `) = (`+ qvalues[1:]+ `) WHERE account_id = $`+ strconv.Itoa(n), exec)
-		}
-		if action == 'a' {
-			// add
-			res = model.Crud.Insert(`
-			INSERT INTO account (`+ q[1:]+ `) VALUES (`+ qvalues[1:]+ `) RETURNING account_id`, exec)
-			library.VALIDATION.Result["id"] = strconv.FormatInt(res, 10)
-		}
-		if res > 0 {
-			library.VALIDATION.Status = 0
-		} else {
-			library.VALIDATION.Status = 30
-			library.VALIDATION.Result["error"] = lang.T(`server error`)
-		}
-	}
 }
 
-func (this *accountController) Del(w http.ResponseWriter, r *http.Request) {
-	idInt64, _ := this.crud.del(w, r)
-	if library.VALIDATION.Status == 0 {
-		res := model.AccountModel.Del(idInt64)
-		if res == 0 {
-			library.VALIDATION.Status = 250
-			library.VALIDATION.Result["error"] = lang.T("not found")
-		}
-		if res > 0 {
-			library.VALIDATION.Status = 0
-		}
-	}
-}
 
-func (this *accountController) Inlist(w http.ResponseWriter, r *http.Request) {
-	var columns = map[string]string{"account_nick": "string", "account_ban": "boolean", "account_email": "email", "account_phone": "phone", "account_password": "password"}
-	this.crud.inlist(columns, r)
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

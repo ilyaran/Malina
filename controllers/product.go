@@ -1,215 +1,325 @@
-/**
- * Product Controller class.  github.com/ilyaran/Malina eCommerce application
- *
- *
- * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
- * @version		1.0.0
- * @based on
- * @email      		il.aranov@gmail.com
- * @link
- * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
- * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
- */
-package controller
+package controllers
 
 import (
 	"net/http"
-	"github.com/ilyaran/Malina/helpers"
-	"github.com/ilyaran/Malina/models"
-	"github.com/ilyaran/Malina/views/product"
-	"github.com/ilyaran/Malina/config"
-	"fmt"
+	"strconv"
 	"encoding/json"
-	"github.com/ilyaran/Malina/language"
-	"github.com/ilyaran/Malina/entity"
 	"github.com/ilyaran/Malina/views"
-	"github.com/ilyaran/Malina/views/publicView"
+	"github.com/ilyaran/Malina/models"
+	"github.com/ilyaran/Malina/filters"
+	"github.com/ilyaran/Malina/app"
+	"github.com/ilyaran/Malina/lang"
+	"github.com/ilyaran/Malina/berry"
+	"github.com/ilyaran/Malina/entity"
 	"github.com/ilyaran/Malina/libraries"
 	"html/template"
-	"strconv"
+	"fmt"
+	"github.com/ilyaran/Malina/views/publicView"
 )
 
-var Product = &ProductController{&CrudController{}}
-type ProductController  struct {
-	crud *CrudController
+var ProductController *Product
+func ProductControllerInit(){
+	ProductController = &Product{base:&base{
+		dbtable:"product",
+		item:&entity.Product{},
+		selectSqlFieldsDefault 	:
+		`product_id,
+		 product_code,
+		 coalesce(product_category,0),
+		 product_parameter,
+		 product_img,
+		 product_title,
+		 coalesce(product_description,''),
+		 product_price,
+		 product_price1,
+		 product_price2,
+		 coalesce(product_quantity,0),
+		 product_sold,
+		 product_views,
+		 product_created,
+		 product_updated,
+		 product_enable`,
+		}}
+
+	//helpers.GenerateControllerFields(ProductController.base.dbtable,ProductController.base.item)
+
+	// model init
+	ProductController.model = models.Product{}
+	// end model init
+
+	// orders init
+	ProductController.base.orderList =[][2]string{
+		{"ORDER BY product_created DESC",lang.T("created")+`&darr;`},
+		{"ORDER BY product_created ASC",lang.T("created")+`&uarr;`},
+		{"ORDER BY product_updated DESC",lang.T("updated")+`&darr;`},
+		{"ORDER BY product_updated ASC",lang.T("updated")+`&uarr;`},
+		{"ORDER BY product_price DESC",lang.T("price")+`&darr;`},
+		{"ORDER BY product_price ASC",lang.T("price")+`&uarr;`},
+	}
+
+	if ProductController.base.orderList==nil || len(ProductController.base.orderList) < 0{
+		panic("order list is not init")
+	}
+	ProductController.base.orderListLength = int64(len(ProductController.base.orderList))
+	// end orders init
+
+	ProductController.base.searchSqlTemplate=`product_title LIKE '%~%' OR product_description LIKE '%~%' OR product_code LIKE '%~%'`
+
+	ProductController.base.inlistSqlFields = map[string]byte{
+		"product_title"     :'s',
+		"product_price"     :'n',
+		"product_price1"    :'n',
+		"product_code"      :'s',
+		"product_enable"    :'b',
+	}
+
+	// view init
+	ProductController.view = views.Product{}
+	for k,_ := range ProductController.base.inlistSqlFields{
+		ProductController.view.InlistFields += `<input class="inlist_fields" type="hidden" value="`+k+`">`
+	}
+	for k,v := range ProductController.base.orderList{
+		ProductController.view.OrderSelectOptions += `<option value="`+strconv.Itoa(k)+`">`+v[1]+`</option>`
+	}
+
+	ProductController.viewPublic=publicView.Product{}
+	// end view init
+
 }
 
-func (this *ProductController) Index(w http.ResponseWriter, r *http.Request) {
-	this.crud.hasPermission("product","product_id",w,r)
-	if library.VALIDATION.Status == 0 {
+type Product struct {
+	base     *base
+	model			models.Product
+	view            views.Product
+	viewPublic      publicView.Product
+}
 
-		publicView.WelcomeViewObj.ProductList = nil
+func(s *Product)Index(malina *berry.Malina, w http.ResponseWriter, r *http.Request){
+	malina.Controller = s
+	malina.TableSql = s.base.dbtable
+	s.base.index(malina,w,r,"")
+}
 
-		model.ProductModel.Query = ``
-		model.ProductModel.Where = ``
-		model.ProductModel.All = 0
+func(s *Product)GetList(malina *berry.Malina, w http.ResponseWriter, r *http.Request, condition string){
 
-		switch this.crud.action {
-		case "ajax_list":
-			if this.AjaxList(w, r) {
-				return
+	category_id,category_idStr := filters.IsUint(malina,false,"category_id",20,r)
+	price_min,price_minStr := filters.IsUint(malina,false,"price_min",20,r)
+	price_max,price_maxStr := filters.IsUint(malina,false,"price_max",20,r)
+
+	if malina.Status > 0 {
+		return
+	}
+
+	var category *entity.Category
+	if category_id > 0 {
+		if malina.Department=="public"{
+			if v,ok := libraries.CategoryLib.MapPublic[category_id]; ok {
+				category=v
+				models.CrudGeneral.WhereAnd(malina,"product_category IN ","("+category_idStr+v.DescendantsString+")")
+				malina.Url+="&category_id="+category_idStr
+				malina.CategoryParameters=v.ParametersListView
 			}
-		case "get":
-			if this.Get(w, r) {
-				return
+		}
+		if malina.Department=="home"{
+			if v,ok := libraries.CategoryLib.Trees.Map[category_id]; ok {
+				models.CrudGeneral.WhereAnd(malina,"product_category IN ","("+category_idStr+v.(*entity.Category).DescendantsString+")")
+				malina.Url+="&category_id="+category_idStr
 			}
-		case "add":
-			this.FormHandler('a', w, r)
-		case "edit":
-			this.FormHandler('e', w, r)
-		case "inlist":
-			this.Inlist(w, r)
-		case "del":
-			this.Del(w, r)
-		default:
-			this.List(w, r); return // "list"
 		}
 	}
-	helper.SetAjaxHeaders(w)
-	out, _ := json.Marshal(library.VALIDATION)
-	fmt.Fprintf(w, string(out))
-}
-
-func (this *ProductController) List(w http.ResponseWriter, r *http.Request) {
-	page, pageStr := this.crud.getList(false,w,r)
-	order := "product_updated ASC"
-	if library.VALIDATION.Status == 0 {
-		//all := model.ProductModel.CountItems(nil,0,0,false)
-		itemList := model.ProductModel.GetList("","","",pageStr,strconv.FormatInt(app.Per_page(),10),order,"")
-		paging := helper.PagingLinks(model.ProductModel.All, page, app.Per_page(), app.Uri_product()+"list/?page=%d","href","a","","")
-
-
-		w.Write([]byte(views.Header()))
-		w.Write([]byte(views.Nav("product")))
-		w.Write([]byte(productView.Index(itemList, paging)))
+	if price_min > 0 && price_max == 0 {
+		models.CrudGeneral.WhereAnd(malina,"product_price >",price_minStr)
+		malina.Url+="&price_min="+price_minStr
+	}else if price_min == 0 && price_max > 0 {
+		models.CrudGeneral.WhereAnd(malina,"product_price <",price_maxStr)
+		malina.Url+="&price_max="+price_maxStr
+	}else if price_min > 0 && price_max > 0 {
+		models.CrudGeneral.WhereAnd(malina,"product_price >",price_minStr)
+		models.CrudGeneral.WhereAnd(malina,"product_price <",price_maxStr)
+		malina.Url+="&price_max="+price_maxStr+"&price_min="+price_minStr
 	}
-}
-
-func (this *ProductController) AjaxList(w http.ResponseWriter, r *http.Request) bool{
-	page, pageStr, per_page, per_pageStr, search, orderInt := this.crud.getAjaxList(false, w, r)
-	this.crud.order_by = `product_updated DESC`
-	switch orderInt {
-		case 2:this.crud.order_by = "product.product_updated DESC"
-		case 3:this.crud.order_by = "product.product_price ASC"
-		case 4:this.crud.order_by = "product.product_price DESC"
-		case 5:this.crud.order_by = "product.product_id ASC"
-		case 6:this.crud.order_by = "product.product_id DESC"
+	if malina.Department == "public" {
+		models.CrudGeneral.WhereAnd(malina,"product_enable =","TRUE")
 	}
-	price_min,price_minStr := library.VALIDATION.IsFloat64(false,"price_min",20,2,r)
-	price_max,price_maxStr := library.VALIDATION.IsFloat64(false,"price_max",20,2,r)
 
-	var categoryWhere = ""
-	category_id, _ := library.VALIDATION.IsInt64(false, "category", 20, r)
-	if category_id > 0{
-		categoryObj,ok := library.CATEGORY.TreeMap[category_id]
-		if ok {
-			categoryWhere = " category_id IN (" + categoryObj.Get_descendantIdsString() + ")"
+	s.base.getList(malina,w,r)
+
+	if malina.Device == "browser" {
+		if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+
+			if malina.Department == "public" {
+				malina.Paging = s.base.paging(malina,"","")
+				w.Write([]byte(s.viewPublic.Listing(malina,category)))
+			}else if malina.Department == "home"{
+				malina.Paging = s.base.paging(malina,"","")
+				w.Write([]byte(s.view.Listing(malina)))
+			}
+
 		}else {
-			library.VALIDATION.Status = 100
-			library.VALIDATION.Result["category"] = lang.T("category is not exist")
+			if malina.Department == "public" {
+				malina.Paging = s.base.paging(malina,"",app.Url_public_product_list+"?"+malina.Url[1:])
+				s.viewPublic.Index(malina,category,w)
+			}else if malina.Department == "home"{
+				malina.Paging = s.base.paging(malina,"",app.Url_home_product_list+"?"+malina.Url[1:])
+				s.view.Index(malina,w)
+			}
 		}
+	}else {
+		out, _ := json.Marshal(malina.List)
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.Write(out)
 	}
-	if library.VALIDATION.Status == 0 {
-		var priceInterval = ""
-		if price_min > 0 && price_max <= 0 {
-			priceInterval = "product_price > " + price_minStr
-		}
-		if price_min <= 0 && price_max > 0 {
-			priceInterval = "product_price BETWEEN 0 AND " + price_maxStr
-		}
-		if price_min > 0 && price_max > 0 {
-			priceInterval = "product_price BETWEEN "+price_minStr+" AND "+price_maxStr
-		}
 
-		var itemList = model.ProductModel.GetList(categoryWhere,priceInterval,search,pageStr,per_pageStr, this.crud.order_by,"")
-		var paging = helper.PagingLinks(model.ProductModel.All, page, per_page, "%d", "data-page", "span","", `class="paging"`)
-
-		helper.SetAjaxHeaders(w)
-		w.Write([]byte(productView.Listing(itemList, paging)))
-
-		return true
-	}
-	return false
 }
 
-func (this *ProductController) Get(w http.ResponseWriter, r *http.Request) bool{
-	idInt64,_ := this.crud.get(w,r)
-	if library.VALIDATION.Status == 0 {
-		var productObj = model.ProductModel.Get(idInt64)
-		if productObj != nil {
-			helper.SetAjaxHeaders(w)
+func (s *Product) FormHandler(malina *berry.Malina,action byte,w http.ResponseWriter,r *http.Request) {
+	// <- 1
+	malina.ChannelBool = make(chan bool)
+	if action=='e'{
+		malina.IdInt64, malina.IdStr = filters.IsUint(malina,true, "id", 20, r)
+		go s.base.isExistItem(malina, malina.IdInt64,"",false,false)
+	}
+	// end <- 1
 
-			out, _ := json.Marshal(productObj)
-			fmt.Fprintf(w, string(out))
-			return true
-		}else {
-			library.VALIDATION.Status = 100
-			library.VALIDATION.Result["product_id"] = lang.T("not found")
+	imgUrls, _, _ := filters.ImgUrls(malina,false, "img", r)
+
+	category_id,_ := filters.IsUint(malina,true,"category_id",20,r)
+	if category_id > 0 && malina.Status == 0 {
+		if _,ok:=libraries.CategoryLib.Trees.Map[category_id];!ok{
+			malina.Status = http.StatusNotAcceptable
+			malina.Result["category_id"]=lang.T("not found")
 		}
 	}
-	return false
-}
+	price,_ := filters.IsFloat64(malina,false,"price",20,2,r)
+	price1,_ := filters.IsFloat64(malina,false,"price1",20,2,r)
+	code := filters.IsValidText(malina,false,"code",false,1,255,`^[\w]+$`,"alpha numeric",r)
+	enable := filters.CheckBox(malina,"enable",r)
 
-func (this *ProductController) FormHandler(action byte,w http.ResponseWriter, r *http.Request) {
-	var idInt64 int64 = 0
-	var productObj *entity.Product
-	if action == 'e'{
-		idInt64,_ = this.crud.edit(w,r)
-		productObj = model.ProductModel.Get(idInt64)
-		if productObj == nil {
-			library.VALIDATION.Status = 100
-			library.VALIDATION.Result["product"] = lang.T("product is not exist")
+	title := template.HTMLEscapeString(r.FormValue("title"))
+	if title==""{
+		malina.Status = http.StatusNotAcceptable
+		malina.Result["title"]=lang.T("required")
+	}else{
+		if len(title) > app.Title_max_len{
+			malina.Status = http.StatusNotAcceptable
+			malina.Result["title"]=lang.T("length must have no more then:")+strconv.Itoa(app.Title_max_len)+" symbols"
 		}
 	}
-	// validating string like this:  "/a/d/c.jpg|/fd/rt/img.png|/some/path/image.gif"
-	var imgUrls = library.VALIDATION.ImgUrls("img",r)
-	category_id, _ := library.VALIDATION.IsInt64(true, "category_id", 20, r)
-	if category_id > 0{
-		var categoryObj = model.CategoryModel.Get(category_id)
-		if categoryObj == nil {
-			library.VALIDATION.Status = 100
-			library.VALIDATION.Result["category_id"] = lang.T("category is not exist")
+	description := r.FormValue("description")
+	short_description := template.HTMLEscapeString(r.FormValue("short_description"))
+	if short_description!="" && len(short_description) > app.Short_description_max_len {
+		malina.Status = http.StatusNotAcceptable
+		malina.Result["short_description"]=lang.T("length must have no more then:")+strconv.Itoa(app.Short_description_max_len)+" symbols"
+	}
+
+	parameters :=filters.IdsList(malina,"parameters",0,false,r)
+	fmt.Println(parameters)
+	related_products:=filters.IdsList(malina,"related_products",0,false,r)
+	fmt.Println(related_products)
+	// <- 1
+	//waiting for item exist result
+	if action == 'e' {
+		if !<-malina.ChannelBool {
+			malina.Status = http.StatusNotFound
+			malina.Result["item_id"] = lang.T("not found")
 		}
 	}
-	price,_ := library.VALIDATION.IsFloat64(false,"price",20,2,r)
-	price1,_ := library.VALIDATION.IsFloat64(false,"price1",20,2,r)
-	enable := library.VALIDATION.CheckBox("enable",r)
-	var title = template.HTMLEscapeString(r.FormValue("title"))
-	var description = r.FormValue("description")
-	code := library.VALIDATION.IsValidText(false,"code",false,12,512,`^[\w]+$`,"alpha numeric",r)
+	// end <- 1
 
-	if library.VALIDATION.Status == 0 {
+	if malina.Status > 0 {
+		return
+	}
 
-		product := entity.NewProduct(idInt64,category_id,price,price1,code,title,description,enable)
-		var res int64
+	var res int64
+	if action == 'a' {
+		res = s.model.Upsert(action,imgUrls, parameters,category_id,title,description,short_description,code,price,price1,enable)
+	} else {
+		res = s.model.Upsert(action,imgUrls, parameters,malina.IdInt64,category_id,title,description,short_description,code,price,price1,enable)
+	}
+	if res > 0 {
+		malina.Status = http.StatusOK
+		models.CrudGeneral.WhereAnd(malina, "product_id =","$1")
+		malina.SelectSql=s.base.selectSqlFieldsDefault
 		if action == 'a'{
-			res = model.ProductModel.Add(product,imgUrls)
-		}else {
-			res = model.ProductModel.Edit(product,imgUrls)
+			models.CrudGeneral.GetItem(malina,s.base.item,"",res)
+		} else {
+			models.CrudGeneral.GetItem(malina,s.base.item,"",malina.IdInt64)
 		}
+		malina.Result["item"] =  malina.Item
+	} else {
+		malina.Status = http.StatusInternalServerError
+		malina.Result["error"] = lang.T(`server error`)
+	}
+}
 
-		if res > 0{
-			library.VALIDATION.Status = 0
+func (s *Product) Item(malina *berry.Malina, w http.ResponseWriter, r *http.Request){
+
+	malina.IdInt64, malina.IdStr = filters.IsUint(malina,true, "id", 20, r)
+
+	if malina.Status > 0 {
+		return
+	}
+	if malina.Department == "public" {
+		models.CrudGeneral.WhereAnd(malina,"product_enable =","TRUE")
+	}
+
+	models.CrudGeneral.WhereAnd(malina, "product_id =","$1")
+	malina.SelectSql=s.base.selectSqlFieldsDefault
+	models.CrudGeneral.GetItem(malina,s.base.item,"",malina.IdInt64)
+
+
+	if malina.Device == "browser" {
+		if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+
+			if malina.Department == "public" {
+
+			}else if malina.Department == "home"{
+
+			}
+
 		}else {
-			library.VALIDATION.Status = 30
-			library.VALIDATION.Result["error"] = lang.T(`server error`)
+			if malina.Department == "public" {
+				s.viewPublic.Single(malina,malina.Item.(*entity.Product),w)
+			}else if malina.Department == "home"{
+
+			}
 		}
+	}else {
+		out, _ := json.Marshal(malina.Item)
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.Write(out)
+	}
+
+
+
+}
+
+
+func (s *Product) ResultHandler(malina *berry.Malina,args ... interface{}){
+
+}
+
+
+
+func(s *Product)Default(malina *berry.Malina, w http.ResponseWriter, r *http.Request){
+	if malina.Action==""{
+		s.GetList(malina,w,r,"")
+	}
+	if malina.Action=="item"{
+		s.Item(malina,w,r)
 	}
 }
-func (this *ProductController) Del(w http.ResponseWriter, r *http.Request) {
-	idInt64,_ := this.crud.del(w,r)
-	if library.VALIDATION.Status == 0 {
-		res := model.ProductModel.Del(idInt64)
-		if res == 0 {
-			library.VALIDATION.Status = 250
-			library.VALIDATION.Result["error"] = lang.T("not found")
-		}
-		if res > 0 {
-			library.VALIDATION.Status = 0
-		}
-	}
-}
-func (this *ProductController) Inlist(w http.ResponseWriter, r *http.Request) {
-	var columns = map[string]string{"product_price":"numeric","product_price1":"numeric","product_code":"string","product_title":"string","product_enable":"boolean"}
-	this.crud.inlist(columns,r)
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

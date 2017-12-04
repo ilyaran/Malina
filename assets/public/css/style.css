@@ -197,7 +197,7 @@ ul {
 }
 .menu ul li a {	
 	width: 100%;
-	display: block;
+	/*display: block;*/
 	position: relative;
 	font-size:1.1em;
 	font-weight: 400;
@@ -1722,3 +1722,113 @@ img.banner-bag {
 	padding: 0 0 0 6.2em;
 }
 }
+
+
+/*----*/
+h3.cate {
+	color: #fff;
+	font-size: 1.7em;
+	padding: 0.6em ;
+	background: #000;
+	margin: 0;
+}
+/*----*/
+ul.kid-menu{
+	display: block !important;
+}
+.menu {
+	width: auto;
+	height: auto;
+	padding: 0;
+	list-style: none;
+	margin: 0;
+	background: #FBFBFC;
+}
+.menu ul {
+	padding: 0;
+	list-style: none;
+}
+.menu ul {
+	display: none;
+}
+.menu > li > span {
+	width: 100%;
+	line-height: 3.5em;
+	text-indent: 1.2em;
+	display: block;
+	position: relative;
+	color: #000;
+	font-size: 1.1em;
+	text-decoration:none;
+	border-bottom: 1px solid #ddd;
+	font-weight:700;
+}
+.menu ul li span {
+	width: 100%;
+	display: block;
+	position: relative;
+	font-size:1.1em;
+	font-weight: 400;
+	color: #000;
+	text-decoration:none;
+	border-bottom: 1px solid #ddd;
+	font-weight:700;
+	line-height: 3.5em;
+	text-indent: 1.2em;
+}
+.menu ul li span {
+	width: 100%;
+	display: block;
+	position: relative;
+	font-size:1.1em;
+	font-weight: 400;
+	color: #000;
+	text-decoration:none;
+	border-bottom: 1px solid #ddd;
+	font-weight:700;
+	line-height: 3.5em;
+	text-indent: 1.2em;
+}
+/*.menu ul li a:hover{
+    background: #1DBAA5;
+}*/
+.menu > li > span:hover, .menu > li > span.active {
+	background:#fff;
+}
+.menu ul.kid-menu li span{
+	border-bottom: none;
+}
+ul.kid-menu{
+	padding: 0;
+	margin: 0;
+}
+ul.kid-menu li{
+	list-style: none;
+	border-bottom: 1px solid #ddd;
+}
+ul.kid-menu li.menu-kid-left{
+	border-bottom:none;
+}
+ul.cute li{
+	background: #fff;
+}
+.arrow-btn{
+	float: right;
+	margin-top: 0px;
+}
+
+/*--menu--*/
+
+.menu ul li span {
+	font-size: 1em;
+	line-height: 2.5em;
+}
+.menu > li > span {
+	font-size: 1em;
+	line-height: 2.5em;
+}
+.menu input {
+	float: left;
+}
+
+.error{color:red;}

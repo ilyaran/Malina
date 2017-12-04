@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 9.6.1
--- Dumped by pg_dump version 9.6.1
+-- Dumped from database version 10.0
+-- Dumped by pg_dump version 10.0
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -13,20 +13,6 @@ SET standard_conforming_strings = on;
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET row_security = off;
-
---
--- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
---
-
-CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
-
-
---
--- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
---
-
-COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
-
 
 SET search_path = public, pg_catalog;
 
@@ -138,8 +124,8 @@ BEGIN
       ON sc.cart_product = p.product_id
   WHERE sc.cart_id = inCartId AND NOT cart_buy_now
   LOOP
-  RETURN NEXT outCartSavedProductRow;
-END LOOP;
+    RETURN NEXT outCartSavedProductRow;
+  END LOOP;
 END;
 $_$;
 
@@ -199,11 +185,11 @@ CREATE FUNCTION cart_remove_product(character, bigint) RETURNS void
     LANGUAGE plpgsql
     AS $_$
 DECLARE
-inCartId ALIAS FOR $1;
-inProductId ALIAS FOR $2;
+  inCartId ALIAS FOR $1;
+  inProductId ALIAS FOR $2;
 BEGIN
-DELETE FROM cart
-WHERE cart_id = inCartId AND cart_product = inProductId;
+  DELETE FROM cart
+  WHERE cart_id = inCartId AND cart_product = inProductId;
 END;
 $_$;
 
@@ -278,6 +264,7 @@ DECLARE
 BEGIN
 
   INSERT INTO product (
+    product_category,
     product_title,
     product_description,
     product_code,
@@ -287,11 +274,9 @@ BEGIN
     product_img,
     search_vector)
   VALUES
-    (inTitle, inDescription,inCode,inPrice,inPrice1,inEnable,inImgId,
+    (inCategoryId,inTitle, inDescription,inCode,inPrice,inPrice1,inEnable,inImgId,
      (setweight(to_tsvector(inTitle), 'A') || to_tsvector(inDescription)));
   SELECT INTO lastInsertId currval('product_product_id_seq');
-
-  INSERT INTO product_category (product_id, category_id) VALUES (lastInsertId,inCategoryId);
 
   UPDATE category SET category_quantity = category_quantity + 1 WHERE category_id = inCategoryId;
 
@@ -322,11 +307,20 @@ DECLARE
 
 BEGIN
 
---IF (SELECT count(*) FROM img WHERE img_id = ALL (inImgId)) != array_length(inImgId,1)
---THEN RETURN -10;
---END IF;
+ /* UPDATE category SET
+    (category_quantity)
+    =
+    coalesce((
+      SELECT category_quantity-1 FROM category
+      WHERE category_id =
+            (
+              SELECT product_category FROM product
+              WHERE product_id = inId AND product_category != inCategoryId
+            )
+    ),0);*/
 
   UPDATE product SET (
+    product_category,
     product_title,
     product_description,
     product_code,
@@ -334,13 +328,23 @@ BEGIN
     product_price1,
     product_enable,
     product_img,
+    product_updated,
     search_vector)
   =
-  (inTitle, inDescription,inCode,inPrice,inPrice1,inEnable,inImgId,
+  (inCategoryId,inTitle, inDescription,inCode,inPrice,inPrice1,inEnable,inImgId,now(),
    (setweight(to_tsvector(inTitle), 'A') || to_tsvector(inDescription)))
   WHERE product_id = inId;
 
-  UPDATE product_category SET category_id = inCategoryId WHERE product_id = inId;
+  /*UPDATE category SET
+    (category_quantity)
+    =
+    coalesce((
+      SELECT category_quantity+1 FROM category
+      WHERE category_id = (
+              SELECT product_category FROM product
+              WHERE product_id = inId AND product_category != inCategoryId
+      ) AND category_id = inCategoryId
+    ),0);*/
 
   RETURN 1;
 END;
@@ -348,26 +352,6 @@ $_$;
 
 
 ALTER FUNCTION public.product_update(bigint, bigint, character varying, character varying, character varying, numeric, numeric, boolean, character varying[]) OWNER TO postgres;
-
---
--- Name: update_product_updated_column(); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION update_product_updated_column() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  IF row(NEW.*) IS DISTINCT FROM row(OLD.*) THEN
-    NEW.product_updated = now();
-    RETURN NEW;
-  ELSE
-    RETURN OLD;
-  END IF;
-END;
-$$;
-
-
-ALTER FUNCTION public.update_product_updated_column() OWNER TO postgres;
 
 SET default_tablespace = '';
 
@@ -379,22 +363,19 @@ SET default_with_oids = false;
 
 CREATE TABLE account (
     account_id bigint NOT NULL,
-    account_email character varying(255),
-    account_nick character varying(255),
-    account_password character varying(512) DEFAULT ''::character varying,
+    account_email character varying(512),
+    account_login character varying(128),
     account_phone character varying(64),
-    account_provider character varying(512) DEFAULT ''::character varying NOT NULL,
-    account_token character varying(512) DEFAULT ''::character varying NOT NULL,
-    account_ban_reason character varying(255) DEFAULT ''::character varying NOT NULL,
-    account_newpass character varying(64) DEFAULT ''::character varying NOT NULL,
-    account_newpass_key character varying(64) DEFAULT ''::character varying NOT NULL,
-    account_newpass_time timestamp without time zone DEFAULT now() NOT NULL,
-    account_last_ip character varying(64) DEFAULT ''::character varying NOT NULL,
+    account_token character varying(512),
     account_last_logged timestamp without time zone DEFAULT now() NOT NULL,
-    account_created timestamp without time zone DEFAULT now() NOT NULL,
+    account_last_ip character varying(128),
     account_updated timestamp without time zone DEFAULT now() NOT NULL,
-    account_position bigint,
-    account_ban boolean DEFAULT false NOT NULL
+    account_password character varying(1024),
+    account_ban boolean DEFAULT false NOT NULL,
+    account_reason character varying(1024) DEFAULT ''::character varying NOT NULL,
+    account_ban_duration bigint,
+    account_created timestamp without time zone DEFAULT now() NOT NULL,
+    account_role bigint
 );
 
 
@@ -422,79 +403,6 @@ ALTER SEQUENCE account_account_id_seq OWNED BY account.account_id;
 
 
 --
--- Name: activation; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE activation (
-    activation_id bigint NOT NULL,
-    activation_email character varying(256) DEFAULT ''::character varying NOT NULL,
-    activation_nick character varying(256) DEFAULT ''::character varying NOT NULL,
-    activation_password character varying(128) DEFAULT ''::character varying NOT NULL,
-    activation_key character varying(256) DEFAULT ''::character varying NOT NULL,
-    activation_last_ip character varying(64) DEFAULT ''::character varying NOT NULL,
-    activation_created bigint DEFAULT (date_part('epoch'::text, now()))::bigint NOT NULL,
-    activation_phone character varying(64) DEFAULT ''::character varying NOT NULL
-);
-
-
-ALTER TABLE activation OWNER TO postgres;
-
---
--- Name: activation_activation_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE activation_activation_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE activation_activation_id_seq OWNER TO postgres;
-
---
--- Name: activation_activation_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE activation_activation_id_seq OWNED BY activation.activation_id;
-
-
---
--- Name: attempt; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE attempt (
-    attempt_id bigint NOT NULL,
-    attempt_ip character varying(64) DEFAULT ''::character varying NOT NULL,
-    attempt_time bigint DEFAULT (date_part('epoch'::text, now()))::bigint NOT NULL
-);
-
-
-ALTER TABLE attempt OWNER TO postgres;
-
---
--- Name: attempt_attempt_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE attempt_attempt_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE attempt_attempt_id_seq OWNER TO postgres;
-
---
--- Name: attempt_attempt_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE attempt_attempt_id_seq OWNED BY attempt.attempt_id;
-
-
---
 -- Name: cart; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -515,14 +423,17 @@ ALTER TABLE cart OWNER TO postgres;
 
 CREATE TABLE category (
     category_id bigint NOT NULL,
-    category_sort bigint DEFAULT 100 NOT NULL,
-    category_title character varying(255) DEFAULT ''::character varying NOT NULL,
-    category_description text DEFAULT ''::text NOT NULL,
-    category_enable boolean DEFAULT true NOT NULL,
-    category_img character varying(255)[] DEFAULT (ARRAY[]::character varying[])::character varying(128)[] NOT NULL,
-    category_quantity bigint DEFAULT 0 NOT NULL,
     category_parent bigint,
-    category_lang character varying(12) DEFAULT 'en'::character varying NOT NULL
+    category_title character varying(255) DEFAULT ''::character varying NOT NULL,
+    category_description text,
+    category_sort bigint DEFAULT 100 NOT NULL,
+    category_created timestamp without time zone DEFAULT now() NOT NULL,
+    category_updated timestamp without time zone DEFAULT now() NOT NULL,
+    category_quantity bigint DEFAULT 0 NOT NULL,
+    category_img character varying(255)[],
+    category_parameter bigint[],
+    category_enable boolean DEFAULT true NOT NULL,
+    category_lang character varying(24) DEFAULT ''::character varying NOT NULL
 );
 
 
@@ -550,27 +461,33 @@ ALTER SEQUENCE category_category_id_seq OWNED BY category.category_id;
 
 
 --
--- Name: coupon; Type: TABLE; Schema: public; Owner: postgres
+-- Name: news; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE coupon (
-    coupon_id bigint NOT NULL,
-    coupon_code character varying(512) DEFAULT ''::character varying NOT NULL,
-    coupon_start_time timestamp without time zone,
-    coupon_end_time timestamp without time zone,
-    coupon_used bigint DEFAULT 0 NOT NULL,
-    coupon_used_limit bigint DEFAULT 1 NOT NULL,
-    coupon_per_product bigint DEFAULT 1 NOT NULL
+CREATE TABLE news (
+    news_id bigint NOT NULL,
+    news_title character varying(255) DEFAULT ''::character varying NOT NULL,
+    news_description text,
+    news_created timestamp without time zone DEFAULT now() NOT NULL,
+    news_updated timestamp without time zone DEFAULT now() NOT NULL,
+    news_img character varying(255)[],
+    news_account bigint,
+    news_comment bigint[],
+    news_enable boolean DEFAULT true NOT NULL,
+    news_category bigint,
+    news_views bigint DEFAULT 0 NOT NULL,
+    news_like bigint DEFAULT 0 NOT NULL,
+    news_short_description character varying(1024) DEFAULT ''::character varying NOT NULL
 );
 
 
-ALTER TABLE coupon OWNER TO postgres;
+ALTER TABLE news OWNER TO postgres;
 
 --
--- Name: coupon_coupon_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: news_news_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-CREATE SEQUENCE coupon_coupon_id_seq
+CREATE SEQUENCE news_news_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -578,35 +495,39 @@ CREATE SEQUENCE coupon_coupon_id_seq
     CACHE 1;
 
 
-ALTER TABLE coupon_coupon_id_seq OWNER TO postgres;
+ALTER TABLE news_news_id_seq OWNER TO postgres;
 
 --
--- Name: coupon_coupon_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: news_news_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
-ALTER SEQUENCE coupon_coupon_id_seq OWNED BY coupon.coupon_id;
+ALTER SEQUENCE news_news_id_seq OWNED BY news.news_id;
 
 
 --
--- Name: img; Type: TABLE; Schema: public; Owner: postgres
+-- Name: parameter; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE img (
-    img_id bigint NOT NULL,
-    img_name character varying(255) DEFAULT ''::character varying NOT NULL,
-    img_path character varying(255) DEFAULT ''::character varying NOT NULL,
-    img_url character varying(255) DEFAULT ''::character varying NOT NULL,
-    img_thumb character varying(255) DEFAULT ''::character varying NOT NULL
+CREATE TABLE parameter (
+    parameter_id bigint NOT NULL,
+    parameter_title character varying(255) DEFAULT ''::character varying NOT NULL,
+    parameter_parent bigint,
+    parameter_sort bigint DEFAULT 100 NOT NULL,
+    parameter_description text,
+    parameter_value character varying(1024) DEFAULT ''::character varying NOT NULL,
+    parameter_created timestamp without time zone DEFAULT now() NOT NULL,
+    parameter_updated timestamp without time zone DEFAULT now() NOT NULL,
+    parameter_enable boolean DEFAULT true NOT NULL
 );
 
 
-ALTER TABLE img OWNER TO postgres;
+ALTER TABLE parameter OWNER TO postgres;
 
 --
--- Name: img_img_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: parameter_parameter_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-CREATE SEQUENCE img_img_id_seq
+CREATE SEQUENCE parameter_parameter_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -614,13 +535,13 @@ CREATE SEQUENCE img_img_id_seq
     CACHE 1;
 
 
-ALTER TABLE img_img_id_seq OWNER TO postgres;
+ALTER TABLE parameter_parameter_id_seq OWNER TO postgres;
 
 --
--- Name: img_img_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: parameter_parameter_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
-ALTER SEQUENCE img_img_id_seq OWNED BY img.img_id;
+ALTER SEQUENCE parameter_parameter_id_seq OWNED BY parameter.parameter_id;
 
 
 --
@@ -629,8 +550,9 @@ ALTER SEQUENCE img_img_id_seq OWNED BY img.img_id;
 
 CREATE TABLE permission (
     permission_id bigint NOT NULL,
-    permission_data text DEFAULT ''::text NOT NULL,
-    permission_position bigint
+    permission_title character varying(255) DEFAULT ''::character varying NOT NULL,
+    permission_description text,
+    permission_enable boolean DEFAULT true NOT NULL
 );
 
 
@@ -658,76 +580,35 @@ ALTER SEQUENCE permission_permission_id_seq OWNED BY permission.permission_id;
 
 
 --
--- Name: position; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE "position" (
-    position_id bigint NOT NULL,
-    position_title character varying(256) DEFAULT ''::character varying NOT NULL,
-    position_parent bigint,
-    position_sort integer DEFAULT 100 NOT NULL,
-    position_enable boolean DEFAULT true NOT NULL
-);
-
-
-ALTER TABLE "position" OWNER TO postgres;
-
---
--- Name: position_position_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE position_position_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE position_position_id_seq OWNER TO postgres;
-
---
--- Name: position_position_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE position_position_id_seq OWNED BY "position".position_id;
-
-
---
 -- Name: product; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE product (
     product_id bigint NOT NULL,
-    product_price numeric(20,2) DEFAULT 0.00 NOT NULL,
+    product_code character varying(512) DEFAULT ''::character varying NOT NULL,
+    product_category bigint,
+    product_parameter bigint[],
+    product_img character varying(255)[],
     product_title character varying(255) DEFAULT ''::character varying NOT NULL,
-    product_description character varying(1024) DEFAULT ''::character varying NOT NULL,
+    product_description text,
+    product_price numeric(20,2) DEFAULT 0.00 NOT NULL,
+    product_price1 numeric(20,2) DEFAULT 0.00 NOT NULL,
+    product_price2 numeric(20,2) DEFAULT 0.00,
+    product_quantity numeric DEFAULT 0 NOT NULL,
+    product_sold bigint DEFAULT 0,
+    product_views bigint DEFAULT 0 NOT NULL,
+    product_comment bigint[],
     product_created timestamp without time zone DEFAULT now() NOT NULL,
     product_updated timestamp without time zone DEFAULT now() NOT NULL,
     product_enable boolean DEFAULT true NOT NULL,
     search_vector tsvector,
-    product_img character varying(255)[] DEFAULT (ARRAY[]::character varying[])::character varying(255)[] NOT NULL,
-    product_code character varying(255) DEFAULT ''::character varying NOT NULL,
-    product_price1 numeric(20,2) DEFAULT 0.00 NOT NULL,
-    product_watch bigint DEFAULT 0 NOT NULL,
-    product_like bigint[] DEFAULT ARRAY[]::bigint[] NOT NULL,
-    product_soled bigint DEFAULT 0 NOT NULL
+    product_like bigint DEFAULT 0 NOT NULL,
+    product_star character(1) DEFAULT '1'::bpchar NOT NULL,
+    product_short_description character varying(2048) DEFAULT ''::character varying NOT NULL
 );
 
 
 ALTER TABLE product OWNER TO postgres;
-
---
--- Name: product_category; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE product_category (
-    product_id bigint NOT NULL,
-    category_id bigint NOT NULL
-);
-
-
-ALTER TABLE product_category OWNER TO postgres;
 
 --
 -- Name: product_product_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -751,56 +632,26 @@ ALTER SEQUENCE product_product_id_seq OWNED BY product.product_id;
 
 
 --
--- Name: session; Type: TABLE; Schema: public; Owner: postgres
+-- Name: role; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE session (
-    session_id character varying(512) NOT NULL,
-    session_ip character varying(64) DEFAULT ''::character varying NOT NULL,
-    session_timestamp bigint DEFAULT (date_part('epoch'::text, now()))::bigint NOT NULL,
-    session_account bigint,
-    session_email character varying(255),
-    session_nick character varying(255),
-    session_data text DEFAULT ''::text NOT NULL,
-    session_agent character varying(255) DEFAULT ''::character varying NOT NULL,
-    session_data1 text DEFAULT ''::text NOT NULL,
-    session_data2 text DEFAULT ''::text NOT NULL,
-    session_phone character varying(64),
-    session_provider character varying(255) DEFAULT ''::character varying,
-    session_token character varying(255) DEFAULT ''::character varying,
-    session_position bigint
+CREATE TABLE role (
+    role_id bigint NOT NULL,
+    role_parent bigint,
+    role_sort bigint DEFAULT 100 NOT NULL,
+    role_title character varying(255) DEFAULT ''::character varying NOT NULL,
+    role_enable boolean DEFAULT true NOT NULL,
+    role_permission bigint[]
 );
 
 
-ALTER TABLE session OWNER TO postgres;
+ALTER TABLE role OWNER TO postgres;
 
 --
--- Name: shipment; Type: TABLE; Schema: public; Owner: postgres
+-- Name: role_role_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE shipment (
-    shipment_id bigint NOT NULL,
-    shipment_time timestamp without time zone DEFAULT now() NOT NULL,
-    shipment_customer_name character varying(128) DEFAULT ''::character varying NOT NULL,
-    shipment_email character varying(255) DEFAULT ''::character varying NOT NULL,
-    shipment_country character varying(64) DEFAULT ''::character varying NOT NULL,
-    shipment_zip character varying(64) DEFAULT ''::character varying NOT NULL,
-    shipment_state character varying(64) DEFAULT ''::character varying NOT NULL,
-    shipment_city character varying(64) DEFAULT ''::character varying NOT NULL,
-    shipment_address character varying(128) DEFAULT ''::character varying NOT NULL,
-    shipment_phone character varying(64) DEFAULT ''::character varying NOT NULL,
-    shipment_status integer DEFAULT 0 NOT NULL,
-    shipment_comment character varying(255) DEFAULT ''::character varying NOT NULL
-);
-
-
-ALTER TABLE shipment OWNER TO postgres;
-
---
--- Name: shipment_shipment_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE shipment_shipment_id_seq
+CREATE SEQUENCE role_role_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -808,34 +659,42 @@ CREATE SEQUENCE shipment_shipment_id_seq
     CACHE 1;
 
 
-ALTER TABLE shipment_shipment_id_seq OWNER TO postgres;
+ALTER TABLE role_role_id_seq OWNER TO postgres;
 
 --
--- Name: shipment_shipment_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: role_role_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
-ALTER SEQUENCE shipment_shipment_id_seq OWNED BY shipment.shipment_id;
+ALTER SEQUENCE role_role_id_seq OWNED BY role.role_id;
 
+
+--
+-- Name: session; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE session (
+    session_id character varying(512) NOT NULL,
+    session_account bigint,
+    session_created bigint DEFAULT date_part('epoch'::text, now()) NOT NULL,
+    session_data character(1)[],
+    session_user_agent character varying(512) DEFAULT ''::character varying NOT NULL,
+    session_ip character varying(128) DEFAULT ''::character varying NOT NULL,
+    session_email character varying(512),
+    session_login character varying(128),
+    session_token character varying(512),
+    session_phone character varying(64),
+    session_device character varying(512) DEFAULT ''::character varying NOT NULL,
+    session_role bigint
+);
+
+
+ALTER TABLE session OWNER TO postgres;
 
 --
 -- Name: account account_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY account ALTER COLUMN account_id SET DEFAULT nextval('account_account_id_seq'::regclass);
-
-
---
--- Name: activation activation_id; Type: DEFAULT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY activation ALTER COLUMN activation_id SET DEFAULT nextval('activation_activation_id_seq'::regclass);
-
-
---
--- Name: attempt attempt_id; Type: DEFAULT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY attempt ALTER COLUMN attempt_id SET DEFAULT nextval('attempt_attempt_id_seq'::regclass);
 
 
 --
@@ -846,17 +705,17 @@ ALTER TABLE ONLY category ALTER COLUMN category_id SET DEFAULT nextval('category
 
 
 --
--- Name: coupon coupon_id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: news news_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY coupon ALTER COLUMN coupon_id SET DEFAULT nextval('coupon_coupon_id_seq'::regclass);
+ALTER TABLE ONLY news ALTER COLUMN news_id SET DEFAULT nextval('news_news_id_seq'::regclass);
 
 
 --
--- Name: img img_id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: parameter parameter_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY img ALTER COLUMN img_id SET DEFAULT nextval('img_img_id_seq'::regclass);
+ALTER TABLE ONLY parameter ALTER COLUMN parameter_id SET DEFAULT nextval('parameter_parameter_id_seq'::regclass);
 
 
 --
@@ -867,13 +726,6 @@ ALTER TABLE ONLY permission ALTER COLUMN permission_id SET DEFAULT nextval('perm
 
 
 --
--- Name: position position_id; Type: DEFAULT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY "position" ALTER COLUMN position_id SET DEFAULT nextval('position_position_id_seq'::regclass);
-
-
---
 -- Name: product product_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -881,261 +733,195 @@ ALTER TABLE ONLY product ALTER COLUMN product_id SET DEFAULT nextval('product_pr
 
 
 --
--- Name: shipment shipment_id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: role role_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY shipment ALTER COLUMN shipment_id SET DEFAULT nextval('shipment_shipment_id_seq'::regclass);
+ALTER TABLE ONLY role ALTER COLUMN role_id SET DEFAULT nextval('role_role_id_seq'::regclass);
 
 
 --
 -- Data for Name: account; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO account VALUES (38, 'ilyaran1@mail.ru', NULL, 'fc7d504552eec1104873a1d86c12f360145e59153cfd678e57d252857def34f5', NULL, '', '', '', '', '', '2017-05-27 09:08:46.909604', '::1', '2017-05-29 13:38:39.761756', '2017-05-27 09:08:46.909604', '2017-05-27 09:08:46.909604', 2, false);
-INSERT INTO account VALUES (44, 'ilyaraaan@mail.ru', 'player777www', '01e6a06fe0d37c59d3d75f0806db191f7f2def3fce310ce836977d07604af279', '+77026440799', '', '', '', '', '', '2017-05-28 16:13:29.396083', '', '2017-05-28 16:13:29.396083', '2017-05-28 16:13:29.396083', '2017-05-28 16:13:29.396083', NULL, false);
-INSERT INTO account VALUES (43, NULL, 'player6', '01e6a06fe0d37c59d3d75f0806db191f7f2def3fce310ce836977d07604af279', NULL, '', '', '', '', '', '2017-05-28 16:10:10.613654', '', '2017-05-28 16:10:10.613654', '2017-05-28 16:10:10.613654', '2017-05-28 16:10:10.613654', NULL, false);
-INSERT INTO account VALUES (42, NULL, 'player5', '01e6a06fe0d37c59d3d75f0806db191f7f2def3fce310ce836977d07604af279', NULL, '', '', '', '', '', '2017-05-28 16:09:00.927459', '', '2017-05-28 16:09:00.927459', '2017-05-28 16:09:00.927459', '2017-05-28 16:09:00.927459', NULL, true);
-INSERT INTO account VALUES (41, NULL, 'player4', '01e6a06fe0d37c59d3d75f0806db191f7f2def3fce310ce836977d07604af279', NULL, '', '', '', '', '', '2017-05-28 16:06:33.81613', '', '2017-05-28 16:06:33.81613', '2017-05-28 16:06:33.81613', '2017-05-28 16:06:33.81613', NULL, true);
-INSERT INTO account VALUES (40, 'ilyaran3@mail.ru', NULL, 'a737481c2a91b0dc3db235491c85c4a997fb587c02ce04391220581db04fe64c', NULL, '', '', '', '', '', '2017-05-28 11:44:15.946587', '', '2017-05-28 11:44:15.946587', '2017-05-28 11:44:15.946587', '2017-05-28 11:44:15.946587', NULL, false);
-INSERT INTO account VALUES (39, 'ilyaran2@mail.ru', NULL, 'd771e6d5feec19bf37a04232285933d9dcf202757a8f4af53771b348ead309a6', NULL, '', '', '', '', '', '2017-05-27 09:31:26.610499', '::1', '2017-05-27 17:26:20.286622', '2017-05-27 09:31:26.610499', '2017-05-27 09:31:26.610499', NULL, false);
-INSERT INTO account VALUES (1, 'ilyaran@mail.ru', 'ilyaran', 'f3635736ad71032133dfbbf8dcdd136edf5b938d0c19b2bf2cd0f44747b0678e', '+77058436633', '', '', '', '', '', '2017-05-26 20:38:46.129352', '::1', '2017-05-29 15:07:07.406515', '2017-05-26 20:38:46.129352', '2017-05-26 20:38:46.129352', 3, false);
-
-
---
--- Name: account_account_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('account_account_id_seq', 44, true);
-
-
---
--- Data for Name: activation; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-
-
---
--- Name: activation_activation_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('activation_activation_id_seq', 4, true);
-
-
---
--- Data for Name: attempt; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-
-
---
--- Name: attempt_attempt_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('attempt_attempt_id_seq', 1, true);
 
 
 --
 -- Data for Name: cart; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO cart VALUES ('09c85b08d92d5d1fcd2c544fa4ece1511c84a025e7d2613826bb7b1d8daba316                                                                ', 29, 2, true, '2017-04-28 15:42:42.603732');
-INSERT INTO cart VALUES ('09c85b08d92d5d1fcd2c544fa4ece1511c84a025e7d2613826bb7b1d8daba316                                                                ', 27, 1, true, '2017-04-28 15:57:01.561923');
-INSERT INTO cart VALUES ('09c85b08d92d5d1fcd2c544fa4ece1511c84a025e7d2613826bb7b1d8daba316                                                                ', 25, 1, true, '2017-04-28 15:59:30.157029');
-INSERT INTO cart VALUES ('09c85b08d92d5d1fcd2c544fa4ece1511c84a025e7d2613826bb7b1d8daba316                                                                ', 24, 1, true, '2017-04-28 15:59:49.330372');
-INSERT INTO cart VALUES ('09c85b08d92d5d1fcd2c544fa4ece1511c84a025e7d2613826bb7b1d8daba316                                                                ', 26, 4, true, '2017-04-28 15:59:21.41243');
-INSERT INTO cart VALUES ('09c85b08d92d5d1fcd2c544fa4ece1511c84a025e7d2613826bb7b1d8daba316                                                                ', 23, 1, true, '2017-04-28 16:25:43.883635');
-INSERT INTO cart VALUES ('09c85b08d92d5d1fcd2c544fa4ece1511c84a025e7d2613826bb7b1d8daba316                                                                ', 28, 1, true, '2017-04-28 16:30:14.216816');
-INSERT INTO cart VALUES ('6b5eae5f37f54ad36e07dd63c36843d5e516d7caa8adf0fcd8adf7eddeebf6ba                                                                ', 28, 1, true, '2017-04-30 11:40:54.518462');
-INSERT INTO cart VALUES ('6b5eae5f37f54ad36e07dd63c36843d5e516d7caa8adf0fcd8adf7eddeebf6ba                                                                ', 30, 1, true, '2017-04-30 11:40:54.518462');
-INSERT INTO cart VALUES ('6b5eae5f37f54ad36e07dd63c36843d5e516d7caa8adf0fcd8adf7eddeebf6ba                                                                ', 27, 5, true, '2017-04-30 11:40:54.518462');
-INSERT INTO cart VALUES ('6b5eae5f37f54ad36e07dd63c36843d5e516d7caa8adf0fcd8adf7eddeebf6ba                                                                ', 29, 1, true, '2017-04-30 11:40:54.518462');
-INSERT INTO cart VALUES ('dee0673b12408c0d95501ed9a3c80a2f95ec7dc46fa306d4052aa3202a303584                                                                ', 33, 1, true, '2017-05-29 11:24:26.29628');
-INSERT INTO cart VALUES ('898e181cfb20842a11000bf593ba9a841a5bf714a2f60e339d4ba850c8fb562a                                                                ', 26, 1, true, '2017-04-29 16:14:53.86801');
-INSERT INTO cart VALUES ('898e181cfb20842a11000bf593ba9a841a5bf714a2f60e339d4ba850c8fb562a                                                                ', 25, 7, true, '2017-04-29 16:14:53.86801');
-INSERT INTO cart VALUES ('dee0673b12408c0d95501ed9a3c80a2f95ec7dc46fa306d4052aa3202a303584                                                                ', 32, 1, true, '2017-05-29 11:59:39.767803');
-INSERT INTO cart VALUES ('dee0673b12408c0d95501ed9a3c80a2f95ec7dc46fa306d4052aa3202a303584                                                                ', 36, 1, true, '2017-05-29 11:59:45.78594');
-INSERT INTO cart VALUES ('dee0673b12408c0d95501ed9a3c80a2f95ec7dc46fa306d4052aa3202a303584                                                                ', 29, 5, true, '2017-05-29 11:24:41.759784');
 
 
 --
 -- Data for Name: category; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO category VALUES (13, 140, 'Food', '', true, '{/assets/uploads/roxy-fileman-logo.gif}', 3, NULL, '');
-INSERT INTO category VALUES (9, 9225, 'Computers', '<p><img alt="" src="http://localhost:3001/assets/uploads/1e43d48s-960.jpg" style="height:533px; width:800px" /></p>
-', true, '{/assets/uploads/1e43d48s-960.jpg}', 0, NULL, '');
-INSERT INTO category VALUES (20, 100, 'Notebooks', '<p><em><strong>Washing machines</strong></em></p>
+INSERT INTO category VALUES (3, 1, 'Desktop', '', 120, '2017-11-14 21:20:37.199396', '2017-11-14 21:20:37.199396', 0, NULL, NULL, true, '');
+INSERT INTO category VALUES (6, 2, 'Ultrabooks', '', 110, '2017-11-15 14:41:56.150225', '2017-11-15 14:41:56.150225', 0, NULL, NULL, true, '');
+INSERT INTO category VALUES (7, 2, 'Notebooks', '', 100, '2017-11-15 14:44:06.041425', '2017-11-15 14:44:06.041425', 0, NULL, NULL, true, '');
+INSERT INTO category VALUES (5, 4, 'Smartphones', '', 100, '2017-11-15 14:41:26.656251', '2017-11-15 14:41:26.656251', 0, NULL, NULL, true, '');
+INSERT INTO category VALUES (4, NULL, 'Gadgets', '', 110, '2017-11-15 14:40:44.758485', '2017-11-15 14:40:44.758485', 2, NULL, NULL, true, '');
+INSERT INTO category VALUES (13, NULL, 'Displays', '&lt;p&gt;Letter | 15 November 2017&lt;/p&gt;
 
-<p><em><strong><img alt="" src="http://localhost:3001/assets/uploads/DSC_2987.jpg" style="height:469px; width:700px" /></strong></em></p>
-', true, '{/assets/uploads/1e43d48s-960.jpg,/assets/uploads/21.gif}', 2, 9, '');
-INSERT INTO category VALUES (22, 100, 'Ultrabooks', '', true, '{/assets/uploads/bag.jpg,/assets/uploads/bo.jpg}', 0, 21, '');
-INSERT INTO category VALUES (25, 110, 'Ultra Gadgets', '<p><img alt="" src="http://localhost:3001/assets/uploads/pic11.jpg" style="height:285px; width:210px" /></p>
-', true, '{/assets/uploads/images555.jpg,/assets/uploads/images.jpg}', 0, 22, '');
-INSERT INTO category VALUES (10, 18025, 'Laptops', '<p><img alt="" src="http://localhost:3001/assets/uploads/roxy-fileman-logo.gif" style="height:127px; width:289px" /></p>
-', true, '{/assets/uploads/pic5.jpg,/assets/uploads/pic7.jpg}', 0, NULL, '');
-INSERT INTO category VALUES (11, 150, 'Furniture', '', true, '{/assets/uploads/1e43d48s-960.jpg}', 0, NULL, '');
-INSERT INTO category VALUES (23, 500, 'Animals pets', '', true, '{/assets/uploads/Documents/uugugugu.jpg,/assets/uploads/Documents/000006801x.jpg}', 6, NULL, '');
-INSERT INTO category VALUES (21, 110, 'Tablets ddd', '', true, '{}', 1, 20, '');
-INSERT INTO category VALUES (24, 101, 'Transport', '', true, '{/assets/uploads/images.jpg,"/assets/uploads/скачанные файлы.jpg",/assets/uploads/21.gif}', 5, NULL, '');
+&lt;h3&gt;&lt;a href=&#34;https://www.nature.com/articles/nature24649&#34;&gt;&lt;img alt=&#34;&#34; src=&#34;https://media.springernature.com/w75h75/nature-static/assets/v1/image-assets/nature24649-f1.jpg&#34; style=&#34;height:75px; width:75px&#34; /&gt;PD-1 is a haploinsufficient suppressor of T cell lymphomagenesis&lt;/a&gt;&lt;/h3&gt;
 
+&lt;p&gt;Loss of the PD-1 receptor promotes the development of T cell non-Hodgkin lymphomas by modulating oncogenic signalling… show more&lt;/p&gt;
 
---
--- Name: category_category_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
+&lt;ul&gt;
+	&lt;li&gt;Tim Wartewig&lt;/li&gt;
+	&lt;li&gt;, Zsuzsanna Kurgyis&lt;/li&gt;
+	&lt;li&gt;&lt;a href=&#34;javascript:;&#34; title=&#34;Show all 12 authors&#34;&gt;[…]&lt;/a&gt;&lt;/li&gt;
+	&lt;li&gt;Jürgen Ruland&lt;/li&gt;
+&lt;/ul&gt;
+', 150, '2017-11-16 13:03:38.596132', '2017-11-16 13:03:38.596132', 0, NULL, NULL, true, '');
+INSERT INTO category VALUES (15, NULL, 'Network ', '', 170, '2017-11-16 13:20:56.537135', '2017-11-16 13:20:56.537135', 0, NULL, NULL, true, '');
+INSERT INTO category VALUES (2, 1, 'Laptops', '<p>News and Views&nbsp;|&nbsp;15 November 2017</p>
 
-SELECT pg_catalog.setval('category_category_id_seq', 28, true);
+<h3><a href="https://www.nature.com/articles/nature24758"><img alt="" src="https://media.springernature.com/w75h75/nature-static/assets/v1/image-assets/nature24758-f1.jpg" style="height:75px; width:75px" />Archaeology: Inequality has deep roots in Eurasia</a></h3>
 
+<p>A study of 64 archaeological sites across four continents shows that the growth of agricultural and political systems&hellip;&nbsp;show more</p>
 
---
--- Data for Name: coupon; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-
-
---
--- Name: coupon_coupon_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('coupon_coupon_id_seq', 1, false);
+<ul>
+	<li>Michelle Elliott</li>
+</ul>
+', 100, '2017-10-31 14:36:34.550983', '2017-10-31 14:36:34.550983', 2, '{Asus-VS248H-P-24-LED-LCD-Monitor-16-9-2-ms-P13729418.jpg,1e43d48s-960.jpg}', NULL, true, '');
+INSERT INTO category VALUES (1, NULL, 'Computers', '<p>Comps</p>
+', 100, '2017-10-31 14:36:34.550983', '2017-10-31 14:36:34.550983', 25, '{8394337.01.prod.jpg}', NULL, true, '');
+INSERT INTO category VALUES (16, NULL, 'WiFi modules cc vv', '', 120, '2017-11-19 18:56:41.084862', '2017-11-19 18:56:41.084862', 0, '{"images (45).jpg","images (3).jpg"}', NULL, true, '');
 
 
 --
--- Data for Name: img; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: news; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO img VALUES (1, 'boss', '', '', '');
-INSERT INTO img VALUES (2, 'boss', '', '', '');
 
 
 --
--- Name: img_img_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+-- Data for Name: parameter; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('img_img_id_seq', 2, true);
+INSERT INTO parameter VALUES (3, 'Graphic', NULL, 100, '', '', '2017-11-13 06:44:44.790707', '2017-11-13 06:44:44.790707', true);
+INSERT INTO parameter VALUES (5, '8 thread', 4, 100, NULL, '', '2017-11-13 07:49:28.44342', '2017-11-13 07:49:28.44342', true);
+INSERT INTO parameter VALUES (6, '16 threads', 4, 110, NULL, '', '2017-11-13 07:51:58.725741', '2017-11-13 07:51:58.725741', true);
+INSERT INTO parameter VALUES (7, 'Display', NULL, 120, '', '', '2017-11-13 17:38:47.50543', '2017-11-13 17:38:47.50543', true);
+INSERT INTO parameter VALUES (8, 'Discrette', 3, 100, '', '', '2017-11-13 21:07:30.633986', '2017-11-13 21:07:30.633986', true);
+INSERT INTO parameter VALUES (11, 'retina', 7, 100, '', '', '2017-11-13 21:57:12.411322', '2017-11-13 21:57:12.411322', true);
+INSERT INTO parameter VALUES (12, 'IPS matrix dddd', 7, 110, '', '', '2017-11-14 10:41:52.021043', '2017-11-14 10:41:52.021043', true);
+INSERT INTO parameter VALUES (20, 'MainBoards', NULL, 200, '', '', '2017-11-19 15:49:33.535599', '2017-11-19 15:49:33.535599', true);
+INSERT INTO parameter VALUES (19, 'MainBoards', NULL, 200, '', '', '2017-11-19 15:49:33.42461', '2017-11-19 15:49:33.42461', true);
+INSERT INTO parameter VALUES (21, '111MainBoards', NULL, 210, '', '', '2017-11-19 15:52:59.597356', '2017-11-19 15:52:59.597356', true);
+INSERT INTO parameter VALUES (24, '333 sdasd dfsdfsdf', NULL, 230, '', '', '2017-11-19 15:56:18.47885', '2017-11-19 15:56:18.47885', true);
+INSERT INTO parameter VALUES (25, 'Integrated', 3, 90, '', '', '2017-11-19 18:38:16.143934', '2017-11-19 18:38:16.143934', true);
+INSERT INTO parameter VALUES (1, 'Processors gg', NULL, 50, 'tgdrtgdrth fd', '', '2017-10-31 14:41:27.175606', '2017-10-31 14:41:27.175606', true);
+INSERT INTO parameter VALUES (2, '4-Core', 1, 60, '&lt;input type=&#34;checkbox&#34;&gt;', '', '2017-10-31 14:41:27.175606', '2017-10-31 14:41:27.175606', true);
+INSERT INTO parameter VALUES (4, 'Threads', 2, 70, 'gdrts drfser', '', '2017-11-13 07:48:50.087554', '2017-11-13 07:48:50.087554', true);
+INSERT INTO parameter VALUES (10, '2Gb', 9, 100, '', '', '2017-11-13 21:37:13.886115', '2017-11-13 21:37:13.886115', true);
+INSERT INTO parameter VALUES (13, '4Gb', 9, 110, '', '', '2017-11-14 11:05:44.317195', '2017-11-14 11:05:44.317195', true);
+INSERT INTO parameter VALUES (9, 'GRAM', 8, 100, '', '', '2017-11-13 21:34:45.601092', '2017-11-13 21:34:45.601092', true);
+INSERT INTO parameter VALUES (16, '6 cores', 1, 110, '<p>Letter&nbsp;|&nbsp;08 November 2017</p>
+
+<h3><a href="https://www.nature.com/articles/nature24476"><img alt="" src="https://media.springernature.com/w75h75/nature-static/assets/v1/image-assets/nature24476-f1.jpg" style="height:75px; width:75px" />Parallel palaeogenomic transects reveal complex genetic history of early European farmers</a></h3>
+
+<p>In European Neolithic populations, the arrival of farmers prompted admixture with local hunter-gatherers over many&hellip;&nbsp;show more</p>
+
+<ul>
+	<li>Mark Lipson</li>
+	<li>,&nbsp;Anna Sz&eacute;cs&eacute;nyi-Nagy</li>
+	<li><a href="javascript:;" title="Show all 57 authors">[&hellip;]</a></li>
+	<li>David Reich</li>
+</ul>
+', '', '2017-11-16 13:39:28.200614', '2017-11-16 13:39:28.200614', true);
 
 
 --
 -- Data for Name: permission; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO permission VALUES (8, 'admin', 3);
-INSERT INTO permission VALUES (9, 'admin', 4);
-INSERT INTO permission VALUES (10, 'admin ddd', 2);
-INSERT INTO permission VALUES (11, 'category fdff', 8);
-INSERT INTO permission VALUES (12, 'permission', 8);
-
-
---
--- Name: permission_permission_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('permission_permission_id_seq', 13, true);
-
-
---
--- Data for Name: position; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-INSERT INTO "position" VALUES (3, 'boss', NULL, 100, true);
-INSERT INTO "position" VALUES (4, 'manager', 3, 100, true);
-INSERT INTO "position" VALUES (2, 'admin  ', 4, 95, true);
-INSERT INTO "position" VALUES (1, 'user', 2, 100, true);
-INSERT INTO "position" VALUES (6, 'sub admin lll', 2, 110, true);
-INSERT INTO "position" VALUES (8, 'under sub admin', 6, 100, true);
-INSERT INTO "position" VALUES (10, '333 under sub', 6, 120, true);
-INSERT INTO "position" VALUES (7, 'sub admin iooii', 2, 120, true);
-INSERT INTO "position" VALUES (15, 'z3xx dfsd dfxdf', 4, 100, true);
-INSERT INTO "position" VALUES (12, 'zxx dfsd dfxdf', 4, 100, true);
-INSERT INTO "position" VALUES (13, 'z1xx dfsd dfxdf', 4, 100, true);
-INSERT INTO "position" VALUES (14, 'z2xx dfsd dfxdf', 4, 100, true);
-
-
---
--- Name: position_position_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('position_position_id_seq', 18, true);
+INSERT INTO permission VALUES (3, 'product', 'add edit delete read', true);
 
 
 --
 -- Data for Name: product; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO product VALUES (21, 102.00, '2558 My Product', '', '2017-04-25 17:48:37.961616', '2017-05-06 13:13:16.332519', true, '''2558'':1A ''product'':3A', '{/assets/uploads/bag.jpg,/assets/uploads/1e43d48s-960.jpg}', '', 0.00, 0, '{}', 0);
-INSERT INTO product VALUES (26, 287.00, '765 Some pet', '', '2017-04-26 07:53:04.817909', '2017-05-01 15:06:24.220413', true, '''765'':1A ''pet'':3A', '{/assets/uploads/pic.jpg,/assets/uploads/pic10.jpg}', '', 0.00, 0, '{}', 0);
-INSERT INTO product VALUES (23, 235.00, 'Some pet good', '<h3><var><em><strong>Возвращаясь к пункту про структуру директории, gb трактует всё, что находится в&nbsp;src/, как код вашего </strong></em></var></h3>
+INSERT INTO product VALUES (35, 'sdfsdfsdf', 1, NULL, NULL, 'Awesome product sdfsa ASdas', '<p>News&nbsp;|&nbsp;17 November 2017</p>
 
-<hr />
-<h3><var><em><strong>проекта. Все зависимые пакаджи устанавливаются в директор</strong></em></var></h3>
+<h3><a href="https://www.nature.com/news/giant-telescope-s-mobile-phone-dead-zones-rile-south-african-residents-1.22998"><img alt="" src="https://www.nature.com/homepage-assets/npg/news/2017/171114/images/w75h75/nature.2017.22998-i7.47693.jpg" style="height:75px; width:75px" />Giant telescope&rsquo;s mobile-phone &lsquo;dead zones&rsquo; rile South African residents</a></h3>
 
-<hr />
-<h3><var><em><strong>ию&nbsp;vendor/&nbsp;и именно оттуда код берется при сборке с помощью gb.</strong></em></var></h3>
-', '2017-04-26 07:52:43.79536', '2017-05-01 15:05:57.121359', true, '''gb'':10,38 ''good'':3A ''pet'':2A ''src'':16 ''vendor'':28 ''берет'':33 ''ваш'':19 ''возвра'':4 ''всё'':12 ''директор'':9,26 ''зависим'':22 ''и'':27 ''имен'':30 ''код'':18,32 ''наход'':14 ''оттуд'':31 ''пакадж'':23 ''помощ'':37 ''проект'':20 ''пункт'':6 ''сборк'':35 ''структур'':8 ''тракт'':11 ''устанавлива'':24', '{/assets/uploads/ch.jpg,/assets/uploads/pi.jpg}', '', 0.00, 0, '{}', 0);
-INSERT INTO product VALUES (25, 25684.18, '554 Some pet dddd', '', '2017-04-26 07:52:57.60257', '2017-04-29 17:55:59.669302', true, '''554'':1A ''dddd'':4A ''pet'':3A', '{/assets/uploads/pic11.jpg,/assets/uploads/pic2.jpg}', '', 0.00, 0, '{}', 0);
-INSERT INTO product VALUES (36, 6565.36, '11 Watch Some vvv', '', '2017-05-26 12:54:55.44247', '2017-05-26 12:59:30.508373', true, '''11'':1A ''vvv'':4A ''watch'':2A', '{}', '', 6445.78, 0, '{}', 0);
-INSERT INTO product VALUES (32, 0.00, 'some product gg', '', '2017-05-08 11:14:08.67008', '2017-05-26 12:43:48.156194', true, '''product'':2A', '{/assets/uploads/1e43d48s-960.jpg,/assets/uploads/21.gif}', '', 0.00, 0, '{}', 0);
-INSERT INTO product VALUES (33, 6565.36, 'Watch Some vvv', '', '2017-05-26 12:41:26.912277', '2017-05-26 12:43:08.875805', true, '''vvv'':3A ''watch'':1A', '{/assets/uploads/pic11.jpg,/assets/uploads/images.jpg}', '', 6445.78, 0, '{}', 0);
-INSERT INTO product VALUES (28, 378.00, 'Parfume ccc', '', '2017-04-27 15:34:09.240468', '2017-05-01 15:07:17.379328', true, '''ccc'':2A ''parfum'':1A', '{/assets/uploads/pic4.jpg,/assets/uploads/s4.jpg,/assets/uploads/sh.jpg}', '', 0.00, 0, '{}', 0);
-INSERT INTO product VALUES (27, 339.00, 'Shoes nike', '', '2017-04-27 15:33:40.925847', '2017-05-01 15:06:59.854226', true, '''nike'':2A ''shoe'':1A', '{/assets/uploads/sh.jpg,/assets/uploads/s4.jpg}', '', 0.00, 0, '{}', 0);
-INSERT INTO product VALUES (30, 312.00, 'Girls ccc', '', '2017-04-27 15:35:17.124572', '2017-05-01 15:06:40.654448', true, '''ccc'':2A ''girl'':1A', '{/assets/uploads/pic12.jpg,/assets/uploads/pi4.jpg}', '', 0.00, 0, '{}', 0);
-INSERT INTO product VALUES (24, 186.00, '344 Some pet', '', '2017-04-26 07:52:50.973054', '2017-05-01 15:05:39.843489', true, '''344'':1A ''pet'':3A', '{/assets/uploads/roxy-fileman-logo.gif,/assets/uploads/000006801x.jpg}', '', 0.00, 0, '{}', 0);
-INSERT INTO product VALUES (22, 152.00, 'My ProductOOOKKK', '', '2017-04-26 07:43:57.314561', '2017-05-01 15:05:23.20969', true, '''productoookkk'':2A', '{/assets/uploads/21.gif,/assets/uploads/11395_original.jpg}', '', 0.00, 0, '{}', 0);
-INSERT INTO product VALUES (29, 647.21, 'Bag ccc', '', '2017-04-27 15:34:40.735855', '2017-05-01 10:43:54.115379', true, '''bag'':1A ''ccc'':2A', '{/assets/uploads/s4.jpg,/assets/uploads/sh.jpg,/assets/uploads/pic4.jpg}', '', 589.36, 0, '{}', 0);
-INSERT INTO product VALUES (31, 568.23, 'Washing machine', '<p><img alt="" src="http://localhost:3001/assets/uploads/21.gif" style="height:272px; width:615px" />&nbsp;</p>
+<p>Sensitive radio dishes of the Square Kilometre Array will affect phone reception &mdash; and could harm local economies, say farmers.</p>
+', 250.98, 253.36, 0.00, 0, 0, 0, NULL, '2017-11-19 14:49:35.376475', '2017-11-19 15:32:04.619066', true, '''17'':6 ''2017'':8 ''affect'':30 ''african'':19 ''array'':28 ''asda'':4A ''awesom'':1A ''could'':34 ''dead'':15 ''dish'':23 ''economi'':37 ''farmer'':39 ''giant'':9 ''harm'':35 ''kilometr'':27 ''local'':36 ''mobil'':13 ''mobile-phon'':12 ''news'':5 ''novemb'':7 ''phone'':14,31 ''product'':2A ''radio'':22 ''recept'':32 ''resid'':20 ''rile'':17 ''say'':38 ''sdfsa'':3A ''sensit'':21 ''south'':18 ''squar'':26 ''telescop'':10 ''zone'':16', 0, '1', '');
+INSERT INTO product VALUES (34, 'zdfdfgfdgdfg', 1, NULL, '{Asus-VS248H-P-24-LED-LCD-Monitor-16-9-2-ms-P13729418.jpg}', 'Monitor cc', '<p>News and Views&nbsp;|&nbsp;15 November 2017</p>
 
-<h1>К ЧЕМУ СНИТСЯ, ЧТО УМЕР ЖИВОЙ. ТОЛКОВАНИЕ СНОВ</h1>
+<h3><a href="https://www.nature.com/articles/nature24760"><img alt="" src="https://media.springernature.com/w75h75/nature-static/assets/v1/image-assets/nature24760-f1.jpg" style="height:75px; width:75px" />Microbiota: A high-pressure situation for bacteria</a></h3>
 
-<blockquote>
-<h2 style="font-style:italic;">Сон, в котором вы видите, как умер кто-то из ваших живых знакомых или родственников, означает, прежде всего, долголетие этого человека. Однако его правильное толкование зависит от того, кто именно умер. Если умерли ваши знакомые, сон предупреждает о возможности серьёзного конфликта с ними из-за вашей несдержанности или легкомыслия. Вам следует контролировать своё поведение и слова. Если умер друг, по какой-то причине отношения с ним могут прерваться.</h2>
-</blockquote>
-', '2017-05-01 15:37:00.218383', '2017-05-01 15:37:00.218383', true, '''machin'':2A ''wash'':1A ''ваш'':22,45,58 ''вид'':15 ''возможн'':50 ''долголет'':30 ''друг'':71 ''жив'':8,23 ''завис'':37 ''знаком'':24,46 ''из-з'':55 ''имен'':41 ''какой-т'':73 ''контролирова'':64 ''конфликт'':52 ''котор'':13 ''кто-т'':18 ''легкомысл'':61 ''могут'':80 ''несдержан'':59 ''ним'':54 ''однак'':33 ''означа'':27 ''отношен'':77 ''поведен'':66 ''правильн'':35 ''предупрежда'':48 ''прежд'':28 ''прерва'':81 ''причин'':76 ''родственник'':26 ''своё'':65 ''серьёзн'':51 ''след'':63 ''слов'':68 ''снит'':5 ''снов'':10 ''сон'':11,47 ''толкован'':9,36 ''умер'':7,17,42,70 ''умерл'':44 ''человек'':32 ''чем'':4', '{/assets/uploads/1e43d48s-960.jpg,/assets/uploads/000006801x.jpg,/assets/uploads/wat.jpg,/assets/uploads/11395_original.jpg}', '', 0.00, 0, '{}', 0);
+<p>Analyses in mice suggest that dietary salt increases blood pressure partly by affecting some of the microbes that&hellip;&nbsp;show more</p>
+
+<ul>
+	<li>David A. Relman</li>
+</ul>
+', 345.00, 343.00, 0.00, 0, 0, 0, NULL, '2017-11-16 12:53:03.521017', '2017-11-16 12:53:17.776602', true, '''15'':6 ''2017'':8 ''affect'':29 ''analys'':17 ''bacteria'':16 ''blood'':25 ''cc'':2A ''david'':37 ''dietari'':22 ''high'':12 ''high-pressur'':11 ''increas'':24 ''mice'':19 ''microb'':33 ''microbiota'':9 ''monitor'':1A ''news'':3 ''novemb'':7 ''part'':27 ''pressur'':13,26 ''relman'':39 ''salt'':23 ''show'':35 ''situat'':14 ''suggest'':20 ''view'':5', 0, '1', '');
+INSERT INTO product VALUES (32, 'sdfzsdf', 4, NULL, '{"images (10).jpg"}', '112 sdfszd zsdsd', '', 256.36, 254.28, 0.00, 0, 0, 0, NULL, '2017-11-15 20:40:02.331731', '2017-11-15 21:14:07.778512', true, '''112'':1A ''sdfszd'':2A ''zsdsd'':3A', 0, '1', '');
 
 
 --
--- Data for Name: product_category; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: role; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO product_category VALUES (25, 23);
-INSERT INTO product_category VALUES (29, 20);
-INSERT INTO product_category VALUES (22, 13);
-INSERT INTO product_category VALUES (24, 23);
-INSERT INTO product_category VALUES (23, 23);
-INSERT INTO product_category VALUES (26, 23);
-INSERT INTO product_category VALUES (30, 20);
-INSERT INTO product_category VALUES (27, 23);
-INSERT INTO product_category VALUES (28, 23);
-INSERT INTO product_category VALUES (31, 21);
-INSERT INTO product_category VALUES (21, 13);
-INSERT INTO product_category VALUES (32, 24);
-INSERT INTO product_category VALUES (33, 24);
-INSERT INTO product_category VALUES (36, 24);
-
-
---
--- Name: product_product_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('product_product_id_seq', 36, true);
 
 
 --
 -- Data for Name: session; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO session VALUES ('6e43effc60d3dd5dd6885c5ea5e68df6b677ef3c0023789014b55717a2f17e72', '::1', 1496072114, NULL, NULL, NULL, 'unauth', 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.75 Safari/537.36', '', '', NULL, '', '', NULL);
+INSERT INTO session VALUES ('094ad34fdb497994d0c3b535d1c18627e77a2e98da69edb6a85874b0751ccef2', NULL, 1511110208, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36', '', NULL, NULL, NULL, NULL, '', NULL);
 
 
 --
--- Data for Name: shipment; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Name: account_account_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
+SELECT pg_catalog.setval('account_account_id_seq', 1, false);
 
 
 --
--- Name: shipment_shipment_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+-- Name: category_category_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('shipment_shipment_id_seq', 1, false);
+SELECT pg_catalog.setval('category_category_id_seq', 16, true);
+
+
+--
+-- Name: news_news_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('news_news_id_seq', 1, false);
+
+
+--
+-- Name: parameter_parameter_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('parameter_parameter_id_seq', 26, true);
+
+
+--
+-- Name: permission_permission_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('permission_permission_id_seq', 3, true);
+
+
+--
+-- Name: product_product_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('product_product_id_seq', 35, true);
+
+
+--
+-- Name: role_role_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('role_role_id_seq', 1, false);
 
 
 --
@@ -1155,19 +941,19 @@ ALTER TABLE ONLY category
 
 
 --
--- Name: coupon coupon_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: news news_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY coupon
-    ADD CONSTRAINT coupon_pkey PRIMARY KEY (coupon_id);
+ALTER TABLE ONLY news
+    ADD CONSTRAINT news_pkey PRIMARY KEY (news_id);
 
 
 --
--- Name: img img_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: parameter parameter_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY img
-    ADD CONSTRAINT img_pkey PRIMARY KEY (img_id);
+ALTER TABLE ONLY parameter
+    ADD CONSTRAINT parameter_pkey PRIMARY KEY (parameter_id);
 
 
 --
@@ -1179,27 +965,19 @@ ALTER TABLE ONLY permission
 
 
 --
--- Name: product_category pk_product_id_category_id; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY product_category
-    ADD CONSTRAINT pk_product_id_category_id PRIMARY KEY (product_id, category_id);
-
-
---
--- Name: position position_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY "position"
-    ADD CONSTRAINT position_pkey PRIMARY KEY (position_id);
-
-
---
 -- Name: product product_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY product
     ADD CONSTRAINT product_pkey PRIMARY KEY (product_id);
+
+
+--
+-- Name: role role_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY role
+    ADD CONSTRAINT role_pkey PRIMARY KEY (role_id);
 
 
 --
@@ -1211,14 +989,6 @@ ALTER TABLE ONLY session
 
 
 --
--- Name: shipment shipment_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY shipment
-    ADD CONSTRAINT shipment_pkey PRIMARY KEY (shipment_id);
-
-
---
 -- Name: account_account_email_uindex; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1226,10 +996,17 @@ CREATE UNIQUE INDEX account_account_email_uindex ON account USING btree (account
 
 
 --
--- Name: account_account_nick_uindex; Type: INDEX; Schema: public; Owner: postgres
+-- Name: account_account_id_uindex; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX account_account_nick_uindex ON account USING btree (account_nick);
+CREATE UNIQUE INDEX account_account_id_uindex ON account USING btree (account_id);
+
+
+--
+-- Name: account_account_login_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX account_account_login_uindex ON account USING btree (account_login);
 
 
 --
@@ -1240,18 +1017,67 @@ CREATE UNIQUE INDEX account_account_phone_uindex ON account USING btree (account
 
 
 --
--- Name: product update_product_updated; Type: TRIGGER; Schema: public; Owner: postgres
+-- Name: account_account_token_uindex; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE TRIGGER update_product_updated BEFORE UPDATE ON product FOR EACH ROW EXECUTE PROCEDURE update_product_updated_column();
+CREATE UNIQUE INDEX account_account_token_uindex ON account USING btree (account_token);
 
 
 --
--- Name: account account_position_position_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: category_category_id_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX category_category_id_uindex ON category USING btree (category_id);
+
+
+--
+-- Name: news_news_id_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX news_news_id_uindex ON news USING btree (news_id);
+
+
+--
+-- Name: parameter_parameter_id_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX parameter_parameter_id_uindex ON parameter USING btree (parameter_id);
+
+
+--
+-- Name: permission_permission_id_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX permission_permission_id_uindex ON permission USING btree (permission_id);
+
+
+--
+-- Name: product_product_id_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX product_product_id_uindex ON product USING btree (product_id);
+
+
+--
+-- Name: role_role_id_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX role_role_id_uindex ON role USING btree (role_id);
+
+
+--
+-- Name: session_session_id_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX session_session_id_uindex ON session USING btree (session_id);
+
+
+--
+-- Name: account account_role_role_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY account
-    ADD CONSTRAINT account_position_position_id_fk FOREIGN KEY (account_position) REFERENCES "position"(position_id) ON DELETE SET NULL;
+    ADD CONSTRAINT account_role_role_id_fk FOREIGN KEY (account_role) REFERENCES role(role_id) ON DELETE SET NULL;
 
 
 --
@@ -1259,47 +1085,15 @@ ALTER TABLE ONLY account
 --
 
 ALTER TABLE ONLY category
-    ADD CONSTRAINT category_category_category_id_fk FOREIGN KEY (category_parent) REFERENCES category(category_id) ON DELETE SET NULL;
+    ADD CONSTRAINT category_category_category_id_fk FOREIGN KEY (category_parent) REFERENCES category(category_id) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --
--- Name: cart fk_cart_product; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: news news_account_account_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY cart
-    ADD CONSTRAINT fk_cart_product FOREIGN KEY (cart_product) REFERENCES product(product_id) ON DELETE CASCADE;
-
-
---
--- Name: product_category fk_category_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY product_category
-    ADD CONSTRAINT fk_category_id FOREIGN KEY (category_id) REFERENCES category(category_id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: permission fk_permission_position_position_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY permission
-    ADD CONSTRAINT fk_permission_position_position_id FOREIGN KEY (permission_position) REFERENCES "position"(position_id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: product_category fk_product_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY product_category
-    ADD CONSTRAINT fk_product_id FOREIGN KEY (product_id) REFERENCES product(product_id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: position position_position_position_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY "position"
-    ADD CONSTRAINT position_position_position_id_fk FOREIGN KEY (position_parent) REFERENCES "position"(position_id) ON DELETE SET NULL;
+ALTER TABLE ONLY news
+    ADD CONSTRAINT news_account_account_id_fk FOREIGN KEY (news_account) REFERENCES account(account_id) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --
@@ -1307,7 +1101,7 @@ ALTER TABLE ONLY "position"
 --
 
 ALTER TABLE ONLY session
-    ADD CONSTRAINT session_account_account_email_fk FOREIGN KEY (session_email) REFERENCES account(account_email) ON DELETE SET NULL;
+    ADD CONSTRAINT session_account_account_email_fk FOREIGN KEY (session_email) REFERENCES account(account_email) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --
@@ -1315,15 +1109,15 @@ ALTER TABLE ONLY session
 --
 
 ALTER TABLE ONLY session
-    ADD CONSTRAINT session_account_account_id_fk FOREIGN KEY (session_account) REFERENCES account(account_id) ON DELETE SET NULL;
+    ADD CONSTRAINT session_account_account_id_fk FOREIGN KEY (session_account) REFERENCES account(account_id) ON DELETE CASCADE;
 
 
 --
--- Name: session session_account_account_nick_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: session session_account_account_login_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY session
-    ADD CONSTRAINT session_account_account_nick_fk FOREIGN KEY (session_nick) REFERENCES account(account_nick) ON DELETE SET NULL;
+    ADD CONSTRAINT session_account_account_login_fk FOREIGN KEY (session_login) REFERENCES account(account_login) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --
@@ -1335,11 +1129,19 @@ ALTER TABLE ONLY session
 
 
 --
--- Name: session session_position_position_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: session session_account_account_token_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY session
-    ADD CONSTRAINT session_position_position_id_fk FOREIGN KEY (session_position) REFERENCES "position"(position_id) ON UPDATE CASCADE ON DELETE SET NULL;
+    ADD CONSTRAINT session_account_account_token_fk FOREIGN KEY (session_token) REFERENCES account(account_token) ON UPDATE CASCADE ON DELETE SET NULL;
+
+
+--
+-- Name: session session_role_role_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY session
+    ADD CONSTRAINT session_role_role_id_fk FOREIGN KEY (session_role) REFERENCES role(role_id) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --

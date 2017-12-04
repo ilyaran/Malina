@@ -5,17 +5,18 @@
  * @author		John Aran (Ilyas Toxanbayev)
  * @version		1.0.0
  * @based on
- * @email      		il.aranov@gmail.com
+ * @email      	il.aranov@gmail.com
  * @link
- * @github      	https://github.com/ilyaran/Malina
+ * @github      https://github.com/ilyaran/Malina
  * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
  */
-package helper
+
+package helpers
 
 import "fmt"
 
 func PagingLinks(all, page, perPage int64, uri, attr,tag,class,classEl string) string {
-	if all < 1 {
+	if all < 1 || perPage <1 {
 		return ""
 	}
 	var radius = int64(8) //app.Radius()
@@ -77,3 +78,4 @@ func PagingLinks(all, page, perPage int64, uri, attr,tag,class,classEl string) s
 	return outStr
 
 }
+

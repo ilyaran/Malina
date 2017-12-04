@@ -1,16 +1,4 @@
-/**
- * Filemanager controller class.  github.com/ilyaran/Malina eCommerce application
- * The implementation of http://roxyfileman.com/api
- *
- * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
- * @version		1.0.0
- * @based on
- * @email      		il.aranov@gmail.com
- * @link
- * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
- * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
- */
-package controller
+package controllers
 
 import (
 	"net/http"
@@ -27,43 +15,44 @@ import (
 	"strconv"
 	"image/gif"
 	"image/png"
-	"github.com/ilyaran/Malina/libraries"
-	"github.com/ilyaran/Malina/language"
 	"path"
-	"github.com/ilyaran/Malina/config"
-	"github.com/ilyaran/Malina/models"
+	"github.com/ilyaran/Malina/app"
+	"github.com/gorilla/mux"
 )
 
-var Filemanager = &filemanager{crud:&CrudController{}}
+var Filemanager = &filemanager{crud:&base{dbtable:"product"}}
 type filemanager  struct {
-	crud *CrudController
+	crud *base
 	out string
 }
 
 func (this *filemanager) Index(w http.ResponseWriter, r *http.Request) {
-	this.crud.hasPermission("filemanager","",w,r)
+
+	//dao.AuthDao.Authentication(w,r)
+
 	this.out = this.resultError("")
-	if (library.VALIDATION.Status == 0){
-		switch this.crud.action {
-			case "dirtree"      : this.dirtree(w,r)
-			case "createdir"    : this.createdir(w,r)
-			case "deletedir"    : this.deletedir(w,r)
-			case "movedir" 	    : this.movedir(w,r)
-			case "copydir" 	    : this.copydir(w,r)
-			case "renamedir"    : this.renamedir(w,r)
-			case "fileslist"    : this.fileslist(w,r)
-			case "upload" 	    : this.upload(w,r)
-			case "download"     : this.download(w,r)
-			case "downloaddir"  : this.downloaddir(w,r)
-			case "deletefile"   : this.deletefile(w,r)
-			case "movefile"     : this.movefile(w,r)
-			case "copyfile"     : this.copyfile(w,r)
-			case "renamefile"   : this.renamefile(w,r)
-			case "thumb" 	    : this.thumb(w,r);return
+
+	//if dao.AuthDao.Session.Account.Role == app.Admin_role_id {
+		switch mux.Vars(r)["action"] {
+		case "dirtree"      : this.dirtree(w,r)
+		case "createdir"    : this.createdir(w,r)
+		case "deletedir"    : this.deletedir(w,r)
+		case "movedir" 	    : this.movedir(w,r)
+		case "copydir" 	    : this.copydir(w,r)
+		case "renamedir"    : this.renamedir(w,r)
+		case "fileslist"    : this.fileslist(w,r)
+		case "upload" 	    : this.upload(w,r)
+		case "download"     : this.download(w,r)
+		case "downloaddir"  : this.downloaddir(w,r)
+		case "deletefile"   : this.deletefile(w,r)
+		case "movefile"     : this.movefile(w,r)
+		case "copyfile"     : this.copyfile(w,r)
+		case "renamefile"   : this.renamefile(w,r)
+		case "thumb" 	    : this.thumb(w,r);return
 		}
-	}else {
-		this.out = this.resultError(lang.T("unauth access"))
-	}
+	//}else {
+		//this.out = this.resultError(lang.T("unauth access"))
+	//}
 	fmt.Fprintf(w, this.out)
 }
 
@@ -86,16 +75,17 @@ func (this *filemanager) DirRead(dir string)string{
 	return this.out
 }
 func (this *filemanager) dirtree(w http.ResponseWriter, r *http.Request) {
-	dir := "/"+app.Upload_path()[:len(app.Upload_path())-1]//"/assets/uploads" ///r.FormValue("d")
+	//"/assets/uploads" ///r.FormValue("d")
+	dir := "/"+app.Path_assets_uploads[:len(app.Path_assets_uploads)-1]
 	this.out = ``
 	this.DirRead(dir)
 	this.out = "["+this.out[1:]+"]"
 }
 func (this *filemanager) createdir(w http.ResponseWriter, r *http.Request) {
-/*
-d:/assets/Uploads/Documents/gghh/jjhhgg
-n:ytytryt
- */
+	/*
+	d:/assets/Uploads/Documents/gghh/jjhhgg
+	n:ytytryt
+	 */
 	d := r.FormValue("d")
 	n := r.FormValue("n")
 	path_dir := "."+d+"/"+n
@@ -109,9 +99,9 @@ n:ytytryt
 	}
 }
 func (this *filemanager) deletedir(w http.ResponseWriter, r *http.Request) {
-/*
-d:/assets/Uploads/Documents/new_Name/temp_hfhf
- */
+	/*
+	d:/assets/Uploads/Documents/new_Name/temp_hfhf
+	 */
 	d := r.FormValue("d");
 	if path.IsAbs(d) {
 		dir1 := "." + d
@@ -332,7 +322,7 @@ func (this *filemanager) deletefile(w http.ResponseWriter, r *http.Request) {
 			)
 			UPDATE product SET product_img = array_remove(product_img,'`+f+`')
 			WHERE '`+f+`' = ANY(product_img)`
-			model.Crud.Update(del_q, []interface{}{})
+			ProductController.model.Upsert('e',"",del_q)
 		}
 	}else {
 		this.out = this.resultError("invalid")
@@ -467,6 +457,7 @@ func (this *filemanager) resultSuccess(msg string)string{
 func (this *filemanager) resultError(msg string)string{
 	return `{"res" : "error", "msg" : "`+msg+`"}`
 }
+
 
 
 

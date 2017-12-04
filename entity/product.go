@@ -1,302 +1,123 @@
-/**
- * Product entity class.  Malina eCommerce application
- *
- *
- * @author		John Aran (Ilyas Toxanbayev)
- * @version		1.0.0
- * @based on
- * @email      		il.aranov@gmail.com
- * @link
- * @github      	https://github.com/ilyaran/Malina
- * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
- */
 package entity
 
 import (
 	"time"
 	"database/sql"
-	"github.com/ilyaran/Malina/config"
-	"encoding/json"
-	"strings"
+	"github.com/lib/pq"
 )
 
 type Product struct {
-	id                int64
-	category_id       int64
-	price             float64
-	price1            float64
-	quantity	  float64
-	code              string
-	title             string
-	description       string
-	created           time.Time
-	updated           time.Time
-	enable            bool
-	img               []string
-	sold          	  int64
-	watch 			int64
-	like 		int64
-}
-func NewProduct(
-	id int64,
-	category_id int64,
-	price float64,
-	price1 float64,
-	code string,
-	title string,
-	description string,
-	enable bool) *Product {
-
-	return &Product{
-		id:id,
-		category_id:category_id,
-		price:price,
-		price1:price1,
-		code:code,
-		title:title,
-		description:description,
-		enable:enable}
-}
-func (s *Product) Exec() []interface{} {
-	return []interface{}{
-		s.category_id,
-		s.title,
-		s.description,
-		s.code,
-		s.price,
-		s.price1,
-		s.enable,
-	}
-}
-func (s *Product) ExecWithId() []interface{} {
-	return []interface{}{
-		s.id,
-		s.category_id,
-		s.title,
-		s.description,
-		s.code,
-		s.price,
-		s.price1,
-		s.enable,
-	}
-}
-func ProductScanRow(row *sql.Row) *Product {
-	var s = &Product{}
-	var images_sting string
-	err := row.Scan(
-		&s.id,
-		&s.category_id,
-		&s.price,
-		&s.price1,
-		&s.code,
-		&s.title,
-		&s.description,
-		&s.created,
-		&s.updated,
-		&s.enable,
-		&images_sting,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil
-	}
-	if err != nil {
-		panic(err)
-		return nil
-	}
-	if images_sting != `{}` {
-		s.img = strings.Split(images_sting[1:len(images_sting)-1],",")
-	}
-	return s
-}
-func ProductScanRows(rows *sql.Rows) *Product {
-	var s = &Product{}
-	var images_sting string
-	err := rows.Scan(
-		&s.id,
-		&s.category_id,
-		&s.price,
-		&s.price1,
-		&s.code,
-		&s.title,
-		&s.description,
-		&s.created,
-		&s.updated,
-		&s.enable,
-		&images_sting,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil
-	}
-	if err != nil {
-		panic(err)
-		return nil
-	}
-	if  images_sting != `{}` {
-		s.img = strings.Split(images_sting[1:len(images_sting)-1],",")
-	}
-	return s
+	Id int64			`json:"id"`
+	Code string			`json:"code"`
+	Category int64		`json:"category"`
+	Parameter []int64	`json:"parameter"`
+	Img []string		`json:"img"`
+	Title string		`json:"title"`
+	Description string	`json:"description"`
+	Price float64		`json:"price"`
+	Price1 float64		`json:"price1"`
+	Price2 float64		`json:"price2"`
+	Quantity float64	`json:"quantity"`
+	Sold int64			`json:"sold"`
+	Views int64			`json:"views"`
+	Created time.Time	`json:"created"`
+	Updated time.Time	`json:"updated"`
+	Enable bool			`json:"enable"`
 }
 
-func (this *Product)  Get_id() int64 {
-	return this.id
-}
-func (this *Product)  Get_category_id() int64 {
-	return this.category_id
-}
-func (this *Product)  Get_price() float64 {
-	return this.price
-}
-func (this *Product)  Get_price1() float64 {
-	return this.price1
-}
-func (this *Product)  Get_quantity() float64 {
-	return this.quantity
-}
-func (this *Product)  Total() float64 {
-	return this.price * this.quantity
-}
-func (this *Product)  Get_code() string {
-	return this.code
-}
-func (this *Product)  Get_title() string {
-	return this.title
-}
-func (this *Product)  Get_description() string {
-	return this.description
-}
-func (this *Product)  Get_created() time.Time {
-	return this.created
-}
-func (this *Product)  Get_updated() time.Time {
-	return this.updated
-}
-func (this *Product)  Get_enable() bool {
-	return this.enable
-}
-func (this *Product)  Get_img() []string {
-	return this.img
-}
-func (this *Product)  Get_logo() string {
-	if len(this.img) > 0 {
-		return app.Base_url() + app.Upload_path() + this.img[0]
+func (s *Product) Appending(rows *sql.Rows,size int64)*[]Scanable{
+	list := make([]Scanable, 0, size)
+	for rows.Next() {
+		item := &Product{}
+		if item.Scanning(nil, rows) == 'o' {
+			list = append(list, item)
+		}else {
+			return nil
+		}
 	}
-	return app.No_image()
+	return &list
 }
-
-//**********************************
-func (t *Product) JsonEncode() string {
-	b, err := json.Marshal(t.GetJsonAdaptedType())
-	if err != nil {
-		return ""
-		//log.Fatal(err)
+func (s *Product) Item(row *sql.Row) Scanable {
+	item := Product{}
+	if item.Scanning(row, nil) == 'o' {
+		return &item
 	}
-	//log.Printf("%s", b)
-	return string(b)
-}
-func (t *Product) JsonDecode(jsonString []byte) *Product {
-	o := new(Product)
-	err := json.Unmarshal(jsonString, &o)
-	if err != nil {
-		//log.Fatal(err)
-		return nil
-	}
-	//log.Printf("%#v", t)
-	return o
-}
-func (t *Product) GetJsonAdaptedType() *JsonProduct {
-	return &JsonProduct{
-		t.id,
-		t.category_id,
-		t.price,
-		t.price1,
-		t.code,
-		t.title,
-		t.description,
-		t.created,
-		t.updated,
-		t.enable,
-		t.img,
-	}
-}
-
-type JsonProduct struct {
-	Id                int64                `json:"id"`
-	Category_id       int64        `json:"category_id"`
-	Price             float64                `json:"price"`
-	Price1            float64                `json:"price1"`
-	Code              string                `json:"code"`
-	Title             string                `json:"title"`
-	Description       string        `json:"description"`
-	Created           time.Time        `json:"created"`
-	Updated           time.Time        `json:"updated"`
-	Enable            bool                `json:"enable"`
-	Img               []string                `json:"img"`
-}
-
-func (t *Product) MarshalJSON() ([]byte, error) {
-	return json.Marshal(t.GetJsonAdaptedType())
-}
-
-func (t *Product) UnmarshalJSON(b []byte) error {
-	temp := &JsonProduct{}
-
-	if err := json.Unmarshal(b, &temp); err != nil {
-		return err
-	}
-
-	t.id = temp.Id
-	t.category_id = temp.Category_id
-	t.price = temp.Price
-	t.price1 = temp.Price1
-	t.code = temp.Code
-	t.title = temp.Title
-	t.description = temp.Description
-	t.created = temp.Created
-	t.updated = temp.Updated
-	t.enable = temp.Enable
-	t.img = temp.Img
-
 	return nil
 }
 
 
-//*********** collection
-func GetProductCollectionFromJsonString(jsonString []byte) []*Product {
+func (s *Product) GetId() int64 {return s.Id}
+func (s *Product) SetId(id int64) {s.Id = id}
 
-	ic := new(ProductCollection)
-	err := ic.FromJson(jsonString)
+func (s *Product) GetCode() string {return s.Code}
+func (s *Product) GetCategory() int64 {return s.Category}
+func (s *Product) GetParameter() []int64 {return s.Parameter}
+func (s *Product) GetImg() []string {return s.Img}
+func (s *Product) GetTitle() string {return s.Title}
+func (s *Product) GetDescription() string {return s.Description}
+func (s *Product) GetPrice() float64 {return s.Price}
+func (s *Product) GetPrice1() float64 {return s.Price1}
+func (s *Product) GetQuantity() float64 {return s.Quantity}
+func (s *Product) GetSold() int64 {return s.Sold}
+func (s *Product) GetViews() int64 {return s.Views}
+func (s *Product) GetCreated() time.Time {return s.Created}
+func (s *Product) GetUpdated() time.Time {return s.Updated}
+func (s *Product) GetEnable() bool {return s.Enable}
+
+
+
+func (s *Product) Scanning(row *sql.Row,rows *sql.Rows)byte {
+	var err error
+	if row!=nil {
+		err = row.Scan(
+			&s.Id,
+			&s.Code,
+			&s.Category,
+			pq.Array(&s.Parameter),
+			pq.Array(&s.Img),
+			&s.Title,
+			&s.Description,
+			&s.Price,
+			&s.Price1,
+			&s.Price2,
+			&s.Quantity,
+			&s.Sold,
+			&s.Views,
+			&s.Created,
+			&s.Updated,
+			&s.Enable,
+		)
+	}
+	if rows!=nil {
+		err = rows.Scan(
+			&s.Id,
+			&s.Code,
+			&s.Category,
+			pq.Array(&s.Parameter),
+			pq.Array(&s.Img),
+			&s.Title,
+			&s.Description,
+			&s.Price,
+			&s.Price1,
+			&s.Price2,
+			&s.Quantity,
+			&s.Sold,
+			&s.Views,
+			&s.Created,
+			&s.Updated,
+			&s.Enable,
+		)
+	}
+	if err == sql.ErrNoRows {
+		//panic(err)
+		return 'n'
+	}
 	if err != nil {
 		panic(err)
-		return nil
-	}
-	var productList = []*Product{}
-	for _, v := range ic.Pool {
-		productList = append(productList, &Product{
-			id:v.Id,
-			category_id       :v.Category_id,
-			price             :v.Price,
-			price1            :v.Price1,
-			code              :v.Code,
-			title             :v.Title,
-			description       :v.Description,
-			created           :v.Created,
-			updated           :v.Updated,
-			enable            :v.Enable,
-			img               :v.Img,
-		})
+		return 'e'
 	}
 
-	return productList
+	return 'o'
 }
 
-type ProductCollection struct {
-	Pool []*JsonProduct
-}
 
-func (mc *ProductCollection) FromJson(jsonStr []byte) error {
-	var data = &mc.Pool
-	b := jsonStr
-	return json.Unmarshal(b, data)
-}

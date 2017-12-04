@@ -1,72 +1,89 @@
-package model
+package models
 
 import (
 	"github.com/ilyaran/Malina/entity"
-	"github.com/ilyaran/Malina/config"
-	"strconv"
 	"database/sql"
+	"github.com/ilyaran/Malina/app"
+	"net/http"
 )
 
-var Session *SessionModel = new(SessionModel)
-type SessionModel struct {
-	Where string
-	Query string
-	Exec  []interface{}
-	All   int64
-	Row   *sql.Row
-}
-func (this *SessionModel) Get(sessionId string){
-	this.Row = Crud.GetRow(`
-	WITH t AS (
-		DELETE FROM session WHERE
-		date_part('epoch',CURRENT_TIMESTAMP)::bigint - session.session_timestamp > `+strconv.FormatInt(app.Session_expiration(),10)+`
-	)
-	SELECT session_id,session_data,session_data1,session_data2,
-		coalesce(session_account,0),
-		coalesce(session_email,''),
-		coalesce(session_nick,''),
-		coalesce(session_phone,''),
-		session_provider,
-		session_token,
-		coalesce(session_position,0)
-	FROM session WHERE session_id = $1 LIMIT 1
-	`, []interface{}{sessionId})
+type Session struct {
+	SqlSelectFieldsAccount string
 }
 
-func (this *SessionModel) Add(sess *entity.Session) int64 {
-	// ********** FUTURE TASK ************
-	// should create insert if position != nil etc.
-	if sess.AccountId > 0{
-		var exec = []interface{}{sess.Id,sess.Data,sess.AccountId,sess.Email,sess.Ip_address}
-		this.Query = `
+// return Account and bool. Bool means that session is found, false not found
+func(s *Session)Get(sessionId, ip, user_agent string)(*entity.Account,bool){
+	account := new(entity.Account)
+	row := CrudGeneral.DB.QueryRow(`
 		WITH t AS (
-			UPDATE account SET account_last_ip = $5, account_last_logged = now()
-			WHERE account_id = $3
+			DELETE FROM Session WHERE
+			date_part('epoch',CURRENT_TIMESTAMP)::bigint - session_created > `+app.Session_expirationStr+`
 		)
-		INSERT INTO session (session_id,session_data,session_account,session_email)
-		VALUES ($1,$2,$3,$4,$5) RETURNING 1`
-		return Crud.Insert(this.Query, exec)
+		SELECT `+s.SqlSelectFieldsAccount+` FROM session
+		LEFT JOIN account ON account_id = session_account
+		WHERE session_id = $1 LIMIT 1`, sessionId)
+	if account.Scanning(row,nil) == 'o' {
+		if account.Id > 0 {
+			go s.UpdateAccount(ip,account.Id)
+			return account,true
+		}
+		return nil,true
 	}
-	this.Query = `INSERT INTO session (session_id,session_data) VALUES ($1,$2) RETURNING 1`
-	return Crud.Insert(this.Query, []interface{}{sess.Id,sess.Data})
+
+	return nil,false
 }
 
-func (this *SessionModel) Del(id string) bool {
-	this.Query = `DELETE FROM session WHERE session_id = $1`
-	if Crud.Delete(this.Query, []interface{}{id}) > 0{
-		return true
+func(s *Session)Add(r *http.Request, account *entity.Account,sessionId,ip,userAgent string)string{
+	var err error
+	if account == nil {
+		err = CrudGeneral.DB.QueryRow(`
+		INSERT INTO Session
+		(
+			session_id,
+			session_ip,
+			session_user_agent
+		)VALUES (uuid_generate_v4()||'`+`_`+sessionId+`',$1,$2) RETURNING session_id`,ip,userAgent).Scan(&sessionId)
+	}else {
+		err = CrudGeneral.DB.QueryRow(`
+		INSERT INTO Session
+		(
+			session_id,
+			session_ip,
+			session_user_agent,
+
+			session_account,
+			session_email,
+			session_nick,
+			session_phone,
+			session_token
+		)
+		SELECT uuid_generate_v4()||'`+`_`+sessionId+`',$1,$2,account_id,account_email,account_nick,account_phone,account_token
+		FROM account
+		WHERE account_id = $3
+		RETURNING session_id`, ip,userAgent,account.Id).Scan(&sessionId)
 	}
-	return false
+
+	if err == sql.ErrNoRows {
+		panic(err)
+		return ""
+	}
+	if err != nil {
+		panic(err)
+		return ""
+	}
+	return sessionId
+}
+func(s *Session)UpdateAccount(ip string,accountId int64)int64{
+
+	return CrudGeneral.Update(`
+	UPDATE account
+		SET
+			account_last_logged = now(),
+			account_last_ip = $1
+	WHERE account_id = $2 `,ip,accountId)
 }
 
-func (this *SessionModel) Update(sess *entity.Session) int64 {
-	this.Query = `
-		UPDATE session SET
-			session_ip = $1,
-			session_data = $2
-		WHERE session_id = $3
-	`
-	return 0//Crud.Update(this.Query,[]interface{}{sess.GetIp_address(),sess.GetAccount().GetId(),sess.GetData(),sess.GetId()})
+func(s *Session)Del(sessionId string)int64{
+
+	return CrudGeneral.Delete(`DELETE FROM Session WHERE session_id = $1 `,sessionId)
 }
-
-

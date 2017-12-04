@@ -1,134 +1,217 @@
 package publicView
 
 import (
-	"github.com/ilyaran/Malina/entity"
-	"fmt"
+	"net/http"
+	"github.com/ilyaran/Malina/berry"
+	"html/template"
 	"strconv"
-	"github.com/ilyaran/Malina/config"
-	"github.com/ilyaran/Malina/language"
+	"github.com/ilyaran/Malina/entity"
+	"github.com/ilyaran/Malina/lang"
+	"github.com/ilyaran/Malina/app"
+	"fmt"
+
+	"github.com/ilyaran/Malina/libraries"
 )
 
-var ProductViewObj *ProductView
-func ProductViewObjInit() {
-	ProductViewObj = &ProductView{
-		Layout: NewProductPublicLayout(
-			[]byte(`
-	<!-- start content -->
-<div class="container">
-	<div class="women-product">
-		<div class="w_content">
+type Product struct {
+
+}
+
+func (s *Product)Index(malina *berry.Malina,category *entity.Category,w http.ResponseWriter){
+	var content = `
+		<div class="women-product">
+		<div class=" w_content">
 			<div class="women">
 				<a href="#"><h4>Enthecwear - <span>4449 itemms</span> </h4></a>
 				<ul class="w_nav">
+					<li>Per page : </li>
+					<li>
+						`+PublicLayoutView.Per_page_select+`
+					</li> |
 					<li>Sort : </li>
-					<li><a class="active" href="#">popular</a></li> |
-					<li><a href="#">new </a></li> |
-					<li><a href="#">discount</a></li> |
-					<li><a href="#">price: Low High </a></li>
-					<div class="clearfix"> </div>
-			     	</ul>
-			     	<div class="clearfix"> </div>
+					<li>
+						<select id="order_by">
+							<option value="5">Price Low to High</option>
+							<option value="4">Price High to Low</option>
+						</select>
+					</li>
+
+			     <div class="clearfix"> </div>
+			     </ul>
+			     <div class="clearfix"> </div>
 			</div>
 		</div>
 		<!-- grids_of_4 -->
-		<div class="grid-product">
-	`),
-			[]byte(`
+		<div class="grid-product" id="product_listing">
 
+		`+ s.Listing(malina,category)+`
 
-			<div class="clearfix"> </div>
+		<div class="clearfix"> </div>
 		</div>
 	</div>
-	`)),
+
+		`
+
+	malina.Content=template.HTML(content)
+	PublicLayoutView.response(malina,w)
+}
+
+func (s *Product)Listing(malina *berry.Malina,category *entity.Category)string{
+
+	if malina.List == nil {
+		return `<h1>` + lang.T("no items") + `</h1>`
 	}
+
+	var out, idStr, imgSrc string
+	if category !=nil{
+		out += `
+		<ol class="breadcrumb">
+			<li><a href="`+app.Url_public_product_list+`">All products</a></li>
+			`+category.PublicBreadcrumbPathView+`
+			<li class="active">`+category.Title+`</li>
+		</ol>`
+	}
+
+	out += `
+	<div class="clearfix"> </div>
+	<ul class="pagination">` + malina.Paging + `</ul>
+	<div class="clearfix"> </div>`
+
+	for _,v:=range *malina.List {
+		idStr = strconv.FormatInt(v.(*entity.Product).Id, 10)
+		if v.(*entity.Product).GetImg() != nil {
+			imgSrc = app.Url_assets_uploads + v.(*entity.Product).Img[0]
+		} else {
+			imgSrc = app.Url_no_image
+		}
+		out += `
+
+		<div class="  product-grid">
+			<div class="content_box">
+				<a href="` +app.Url_public_product_item +`?id=` +idStr + `">
+			   	<div class="left-grid-view grid-view-left">
+			   	   	 <img src="` + imgSrc + `" class="img-responsive watch-right" alt=""/>
+				   	   	<div class="mask">
+	                        <div class="info">Quick View</div>
+			            </div>
+				   	  </a>
+				   </div>
+				    <h4><a href="` +app.Url_public_product_item +`?id=` +idStr + `"> ` + v.(*entity.Product).Title + `</a></h4>
+				     <p>` + libraries.CategoryLib.ListPublic[v.(*entity.Product).Category].Title + `</p>
+				     Price:` + fmt.Sprintf("%.2f $", v.(*entity.Product).Price) + `
+			   	</div>
+                 </div>
+				     `
+	}
+
+	out += `
+	<div class="clearfix"> </div>
+	<ul class="pagination">` + malina.Paging + `</ul>`
+
+	return out
 }
-type ProductView struct {
-	Layout      *PublicLayout
-	Product     *entity.Product
-	ProductList []*entity.Product
-	Paging      string
-	temp        string
-}
-func (s *ProductView) Item() {
+
+
+
+func (s *Product)Single(malina *berry.Malina,product *entity.Product,w http.ResponseWriter)string{
 	var images string
-	if len(s.Product.Get_img())>0{
-		for k,v := range s.Product.Get_img(){
+	if product.GetImg()!=nil{
+		for k,v := range product.Img {
 			if k < 1{
 				images += `
 			<li>
 				<a href="optionallink.html">
-					<img class="etalage_thumb_image" src="`+v+`" class="img-responsive" />
-					<img class="etalage_source_image" src="`+v+`" class="img-responsive" title="" />
+					<img class="etalage_thumb_image" src="`+app.Url_assets_uploads+v+`" class="img-responsive" />
+					<img class="etalage_source_image" src="`+app.Url_assets_uploads+v+`" class="img-responsive" title="" />
 				</a>
 			</li>`
 			}else {
 				images += `
 			<li>
-				<img class="etalage_thumb_image" src="`+v+`" class="img-responsive" />
-				<img class="etalage_source_image" src="`+v+`" class="img-responsive" title="" />
+				<img class="etalage_thumb_image" src="`+app.Url_assets_uploads+v+`" class="img-responsive" />
+				<img class="etalage_source_image" src="`+app.Url_assets_uploads+v+`" class="img-responsive" title="" />
 			</li>`
 			}
 		}
 	}else {
-		images = `<li><img class="etalage_thumb_image" src="`+app.No_image()+`" class="img-responsive" /></li>`
+		images = `<li><img class="etalage_thumb_image" src="`+app.Url_no_image+`" class="img-responsive" /></li>`
 	}
-	s.temp = `
-<script src="`+app.Assets_public_path()+`js/jquery.etalage.min.js"></script>
-<script>
-	jQuery(document).ready(function($){
-		$('#etalage').etalage({
-			thumb_image_width: 300,
-			thumb_image_height: 400,
-			source_image_width: 900,
-			source_image_height: 1200,
-			show_hint: true,
-			click_callback: function(image_anchor, instance_id){
-			alert('Callback example:\nYou clicked on an image with the anchor: "'+image_anchor+'"\n(in Etalage instance: "'+instance_id+'")');
-		}
-	});
+	var out=`
+		<link rel="stylesheet" href="`+ app.Url_assets_public+`css/etalage.css" type="text/css" media="all" />
+		<script src="`+ app.Url_assets_public+`js/jquery.etalage.min.js"></script>
+		<script>
+			jQuery(document).ready(function($){
 
-});
-</script>
+				$('#etalage').etalage({
+					thumb_image_width: 300,
+					thumb_image_height: 400,
+					source_image_width: 900,
+					source_image_height: 1200,
+					show_hint: true,
+					click_callback: function(image_anchor, instance_id){
+						alert('Callback example:\nYou clicked on an image with the anchor: "'+image_anchor+'"\n(in Etalage instance: "'+instance_id+'")');
+					}
+				});
 
-<div class="container">
-	<div class=" single_top">
-		<div class="single_grid">
-			<div class="grid images_3_of_2">
-				<ul id="etalage">
+			});
+		</script>
+
+		<div class=" single_top">
+	    	<div class="single_grid">`
+				var category *entity.Category
+	    		if product.Category > 0 {
+					if v,ok:=libraries.CategoryLib.MapPublic[product.Category];ok{
+						category = v
+					}
+				}
+
+				if category !=nil{
+					out += `
+				<ol class="breadcrumb">
+					<li><a href="`+app.Url_public_product_list+`">All products</a></li>
+						`+category.PublicBreadcrumbPathView+`
+					<li class="active"><a href="`+app.Url_public_product_list+`?category_id=`+strconv.FormatInt(category.Id,10)+`">`+category.Title+`</a></li>
+				</ol>`
+				}
+				out+=`
+				<div class="grid images_3_of_2">
+					<ul id="etalage">
 					` + images + `
-				</ul>
-				<div class="clearfix"> </div>
-			</div>
-			<div class="desc1 span_3_of_2">
-				<h4>` + s.Product.Get_title() + `</h4>
-				<div class="cart-b">
-					<div class="left-n ">$` + fmt.Sprintf("%.2f",s.Product.Get_price()) + `</div>
-					<a class="now-get get-cart-in add-to-cart" href="#">`+lang.T("add to cart")+`</a>
-					<div class="clearfix"></div>
+					</ul>
+					<div class="clearfix"> </div>
 				</div>
-				<h6>100 items in stock</h6>
-			   	<p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+				<div class="desc1 span_3_of_2">
+
+
+				<h4>` + product.Title + `</h4>
+				<div class="cart-b">
+					<div class="left-n ">$` + fmt.Sprintf("%.2f",product.Price) + `</div>
+				    <a class="now-get get-cart-in" href="#">ADD TO CART</a>
+				    <div class="clearfix"></div>
+				</div>
+				<h6>` + fmt.Sprintf("%.f", product.Price) + ` items in stock</h6>
+			   	<p>` + product.Description + `</p>
 			   	<div class="share">
 					<h5>Share Product :</h5>
 					<ul class="share_nav">
-						<li><a href="#"><img src="`+app.Assets_public_path()+`images/facebook.png" title="facebook"></a></li>
-						<li><a href="#"><img src="`+app.Assets_public_path()+`images/twitter.png" title="Twiiter"></a></li>
-						<li><a href="#"><img src="`+app.Assets_public_path()+`images/rss.png" title="Rss"></a></li>
-						<li><a href="#"><img src="`+app.Assets_public_path()+`images/gpluse.png" title="Google+"></a></li>
-				    	</ul>
+						<li><a href="#"><img src="`+ app.Url_assets_public+`images/facebook.png" title="facebook"></a></li>
+						<li><a href="#"><img src="`+ app.Url_assets_public+`images/twitter.png" title="Twiiter"></a></li>
+						<li><a href="#"><img src="`+ app.Url_assets_public+`images/rss.png" title="Rss"></a></li>
+						<li><a href="#"><img src="`+ app.Url_assets_public+`images/gpluse.png" title="Google+"></a></li>
+				    </ul>
 				</div>
 			</div>
-          		<div class="clearfix"> </div>
-          	</div>
-          	<ul id="flexiselDemo1">
-			<li><img src="`+app.Assets_public_path()+`images/pi.jpg" /><div class="grid-flex"><a href="#">Bloch</a><p>Rs 850</p></div></li>
-			<li><img src="`+app.Assets_public_path()+`images/pi1.jpg" /><div class="grid-flex"><a href="#">Capzio</a><p>Rs 850</p></div></li>
-			<li><img src="`+app.Assets_public_path()+`images/pi2.jpg" /><div class="grid-flex"><a href="#">Zumba</a><p>Rs 850</p></div></li>
-			<li><img src="`+app.Assets_public_path()+`images/pi3.jpg" /><div class="grid-flex"><a href="#">Bloch</a><p>Rs 850</p></div></li>
-			<li><img src="`+app.Assets_public_path()+`images/pi4.jpg" /><div class="grid-flex"><a href="#">Capzio</a><p>Rs 850</p></div></li>
+          	<div class="clearfix"> </div>
+        </div>
+        <ul id="flexiselDemo1">
+			<li><img src="`+ app.Url_assets_public+`images/pi.jpg" /><div class="grid-flex"><a href="#">Bloch</a><p>Rs 850</p></div></li>
+			<li><img src="`+ app.Url_assets_public+`images/pi1.jpg" /><div class="grid-flex"><a href="#">Capzio</a><p>Rs 850</p></div></li>
+			<li><img src="`+ app.Url_assets_public+`images/pi2.jpg" /><div class="grid-flex"><a href="#">Zumba</a><p>Rs 850</p></div></li>
+			<li><img src="`+ app.Url_assets_public+`images/pi3.jpg" /><div class="grid-flex"><a href="#">Bloch</a><p>Rs 850</p></div></li>
+			<li><img src="`+ app.Url_assets_public+`images/pi4.jpg" /><div class="grid-flex"><a href="#">Capzio</a><p>Rs 850</p></div></li>
 		</ul>
-	    	<script type="text/javascript">
-		 $(window).load(function() {
+	    <script type="text/javascript">
+		$(window).load(function() {
 			$("#flexiselDemo1").flexisel({
 				visibleItems: 5,
 				animationSpeed: 1000,
@@ -154,63 +237,41 @@ func (s *ProductView) Item() {
 
 		});
 		</script>
-		<script type="text/javascript" src="`+app.Assets_public_path()+`js/jquery.flexisel.js"></script>
+		<script type="text/javascript" src="`+ app.Url_assets_public+`js/jquery.flexisel.js"></script>
 
-          	<div class="toogle">
+        <div class="toogle">
 			<h3 class="m_3">Product Details</h3>
-			<p class="m_text">`+s.Product.Get_description()+`</p>
+			<p class="m_text">Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi. Nam liber tempor cum soluta nobis eleifend option congue nihil imperdiet doming id quod mazim placerat facer possim assum.</p>
 		</div>
-        </div>
-       <!---->
+    </div>
 	`
-	s.Layout.Body1 = nil
-	s.Layout.Body2 = []byte(s.temp)
-	s.Layout.Body3 = nil
 
-	s.Layout.WriteResponse()
 
+	malina.Content=template.HTML(out)
+	PublicLayoutView.response(malina,w)
+	return out
 }
 
-func(s *ProductView) List() {
-	s.ProductListing()
 
-	s.Layout.Body2 = []byte(s.temp)
 
-	s.Layout.WriteResponse()
-}
 
-func (s *ProductView) ProductListing(){
-	s.temp = ``
-	var idStr string
-	if s.ProductList != nil && len(s.ProductList)>0 {
-		for _, i := range s.ProductList {
-			idStr = strconv.FormatInt(i.Get_id(),10)
-			var imgSrc string = app.No_image()
-			if len(i.Get_img())>0{imgSrc = i.Get_img()[0]}
-			s.temp += `
-			<div class="product-grid">
-				<div class="content_box">
-					<a href="single.html">
-						<div class="left-grid-view grid-view-left">
-			   				<img style="height:285px;" src="` + imgSrc + `" class="img-responsive watch-right" alt=""/>
-				   			<div class="mask">
-	                        				<div class="info">Quick View</div>
-			            			</div>
-						</a>
-				</div>
-				<h4><a href="`+app.Uri_public_product_get()+`?id=`+idStr+`">` + i.Get_title() +`</a></h4>
-				<p>It is a long established fact that a reader</p>
-				` + fmt.Sprintf("%.2f",i.Get_price()) + `
-				</div>
-			</div>`
-		}
-		s.temp += `<nav aria-label="...">
-				<ul class="pagination">
-					`+s.Paging+`
-				</ul>
-			</nav>`
-	}else {
-		s.temp += `<h1>` + lang.T("no items") + `</h1>`
-	}
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
