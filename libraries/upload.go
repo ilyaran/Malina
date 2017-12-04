@@ -3,8 +3,8 @@ package libraries
 import (
 	"net/http"
 	"runtime"
-	"github.com/ilyaran/Zocl1/lang"
-	"github.com/ilyaran/Zocl1/app"
+	"github.com/ilyaran/Malina/lang"
+	"github.com/ilyaran/Malina/app"
 	"encoding/base64"
 	"fmt"
 	"time"
@@ -13,7 +13,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	_ "image/gif"
-	"github.com/ilyaran/Zocl1/caching"
+	"github.com/ilyaran/Malina/caching"
 	"os"
 	"github.com/ilyaran/Malina/berry"
 )
