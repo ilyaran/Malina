@@ -14,380 +14,7 @@ SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET row_security = off;
 
---
--- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
---
-
-CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
-
-
---
--- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
---
-
-COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
-
-
---
--- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: 
---
-
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
-
-
---
--- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
---
-
-COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
-
-
 SET search_path = public, pg_catalog;
-
---
--- Name: cart_product; Type: TYPE; Schema: public; Owner: postgres
---
-
-CREATE TYPE cart_product AS (
-	product_id bigint,
-	product_img text,
-	product_title character varying(255),
-	product_price numeric(20,2),
-	product_quantity bigint,
-	subtotal numeric(20,2)
-);
-
-
-ALTER TYPE cart_product OWNER TO postgres;
-
---
--- Name: cart_saved_product; Type: TYPE; Schema: public; Owner: postgres
---
-
-CREATE TYPE cart_saved_product AS (
-	product_id bigint,
-	product_title character varying(255),
-	product_price numeric(20,2)
-);
-
-
-ALTER TYPE cart_saved_product OWNER TO postgres;
-
---
--- Name: cart_add_product(character, bigint); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION cart_add_product(character, bigint) RETURNS void
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  inCartId ALIAS FOR $1;
-  inProductId ALIAS FOR $2;
-  productQuantity INTEGER;
-BEGIN
-  SELECT INTO productQuantity
-    cart_quantity
-  FROM cart
-  WHERE cart_id = inCartId AND cart_product = inProductId;
-  IF productQuantity IS NULL THEN
-    INSERT INTO cart(cart_id, cart_product, cart_quantity, cart_created)
-    VALUES (inCartId, inProductId , 1, NOW());
-  ELSE
-    UPDATE cart
-    SET cart_quantity = cart_quantity + 1, cart_buy_now = true
-    WHERE cart_id = inCartId AND cart_product = inProductId;
-  END IF;
-END;
-$_$;
-
-
-ALTER FUNCTION public.cart_add_product(character, bigint) OWNER TO postgres;
-
---
--- Name: cart_get_products(character); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION cart_get_products(character) RETURNS SETOF cart_product
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  inCartId ALIAS FOR $1;
-  outCartProductRow cart_product;
-BEGIN
-  FOR outCartProductRow IN
-  SELECT p.product_id, array_to_string(p.product_img,'|'), p.product_title,
-    COALESCE(NULLIF(p.product_price1, 0), p.product_price) AS price,
-    sc.cart_quantity,
-    COALESCE(NULLIF(p.product_price1, 0),
-             p.product_price) * sc.cart_quantity AS subtotal
-  FROM cart sc
-    INNER JOIN product p
-      ON sc.cart_product = p.product_id
-  WHERE sc.cart_id = inCartId AND sc.cart_buy_now
-  LOOP
-    RETURN NEXT outCartProductRow;
-  END LOOP;
-END;
-$_$;
-
-
-ALTER FUNCTION public.cart_get_products(character) OWNER TO postgres;
-
---
--- Name: cart_get_saved_products(character); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION cart_get_saved_products(character) RETURNS SETOF cart_saved_product
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  inCartId ALIAS FOR $1;
-  outCartSavedProductRow cart_saved_product;
-BEGIN
-  FOR outCartSavedProductRow IN
-  SELECT p.product_id, p.product_title,
-    COALESCE(NULLIF(p.product_price1, 0), p.product_price) AS price
-  FROM cart sc
-    INNER JOIN product p
-      ON sc.cart_product = p.product_id
-  WHERE sc.cart_id = inCartId AND NOT cart_buy_now
-  LOOP
-    RETURN NEXT outCartSavedProductRow;
-  END LOOP;
-END;
-$_$;
-
-
-ALTER FUNCTION public.cart_get_saved_products(character) OWNER TO postgres;
-
---
--- Name: cart_get_total_amount(character); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION cart_get_total_amount(character) RETURNS numeric
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  inCartId ALIAS FOR $1;
-  outTotalAmount NUMERIC(20, 2);
-BEGIN
-  SELECT INTO outTotalAmount
-    SUM(COALESCE(NULLIF(p.product_price1, 0), p.product_price)
-        * sc.cart_quantity)
-  FROM cart sc
-    INNER JOIN product p
-      ON sc.cart_product = p.product_id
-  WHERE sc.cart_id = inCartId AND sc.cart_buy_now;
-  RETURN outTotalAmount;
-END;
-$_$;
-
-
-ALTER FUNCTION public.cart_get_total_amount(character) OWNER TO postgres;
-
---
--- Name: cart_move_product_to_cart(character, integer); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION cart_move_product_to_cart(character, integer) RETURNS void
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  inCartId ALIAS FOR $1;
-  inProductId ALIAS FOR $2;
-BEGIN
-  UPDATE cart
-  SET cart_buy_now = true, cart_created = NOW()
-  WHERE cart_id = inCartId AND cart_product = inProductId;
-END;
-$_$;
-
-
-ALTER FUNCTION public.cart_move_product_to_cart(character, integer) OWNER TO postgres;
-
---
--- Name: cart_remove_product(character, bigint); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION cart_remove_product(character, bigint) RETURNS void
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  inCartId ALIAS FOR $1;
-  inProductId ALIAS FOR $2;
-BEGIN
-  DELETE FROM cart
-  WHERE cart_id = inCartId AND cart_product = inProductId;
-END;
-$_$;
-
-
-ALTER FUNCTION public.cart_remove_product(character, bigint) OWNER TO postgres;
-
---
--- Name: cart_save_product_for_later(character, integer); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION cart_save_product_for_later(character, integer) RETURNS void
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  inCartId ALIAS FOR $1;
-  inProductId ALIAS FOR $2;
-BEGIN
-  UPDATE cart
-  SET cart_buy_now = false, cart_quantity = 1
-  WHERE cart_id = inCartId AND cart_product = inProductId;
-END;
-$_$;
-
-
-ALTER FUNCTION public.cart_save_product_for_later(character, integer) OWNER TO postgres;
-
---
--- Name: cart_update(character, bigint[], bigint[]); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION cart_update(character, bigint[], bigint[]) RETURNS void
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  inCartId ALIAS FOR $1;
-  inProductIds ALIAS FOR $2;
-  inQuantities ALIAS FOR $3;
-BEGIN
-  FOR i IN array_lower(inQuantities, 1)..array_upper(inQuantities, 1)
-  LOOP
-    IF inQuantities[i] > 0 THEN
-      UPDATE cart
-      SET cart_quantity = inQuantities[i], cart_created = NOW()
-      WHERE cart_id = inCartId AND cart_product = inProductIds[i];
-    ELSE
-      PERFORM cart_remove_product(inCartId, inProductIds[i]);
-    END IF;
-  END LOOP;
-END;
-$_$;
-
-
-ALTER FUNCTION public.cart_update(character, bigint[], bigint[]) OWNER TO postgres;
-
---
--- Name: product_add(bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION product_add(bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]) RETURNS bigint
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  inCategoryId      ALIAS FOR $1;
-  inTitle           ALIAS FOR $2;
-  inDescription     ALIAS FOR $3;
-  inShortDescription   ALIAS FOR $4;
-  inCode            ALIAS FOR $5;
-  inPrice           ALIAS FOR $6;
-  inPrice1          ALIAS FOR $7;
-  inEnable          ALIAS FOR $8;
-  inImgUrls           ALIAS FOR $9;
-  inParameterIds           ALIAS FOR $10;
-  lastInsertId BIGINT;
-BEGIN
-
-  INSERT INTO product (
-    product_category,
-    product_title,
-    product_description,
-    product_short_description,
-    product_code,
-    product_price,
-    product_price1,
-    product_enable,
-    product_img,
-    product_parameter,
-    search_vector)
-  VALUES
-    (inCategoryId,inTitle, inDescription,inShortDescription,inCode,inPrice,inPrice1,inEnable,inImgUrls,inParameterIds,
-     (setweight(to_tsvector(inTitle), 'A') || to_tsvector(inDescription)));
-  SELECT INTO lastInsertId currval('product_product_id_seq');
-
-  UPDATE category SET category_quantity = category_quantity + 1 WHERE category_id = inCategoryId;
-
-  RETURN lastInsertId;
-END;
-$_$;
-
-
-ALTER FUNCTION public.product_add(bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]) OWNER TO postgres;
-
---
--- Name: product_update(bigint, bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION product_update(bigint, bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]) RETURNS bigint
-    LANGUAGE plpgsql
-    AS $_$
-DECLARE
-  inId              ALIAS FOR $1;
-  inCategoryId      ALIAS FOR $2;
-  inTitle           ALIAS FOR $3;
-  inDescription     ALIAS FOR $4;
-  inShortDescription ALIAS FOR $5;
-  inCode            ALIAS FOR $6;
-  inPrice           ALIAS FOR $7;
-  inPrice1          ALIAS FOR $8;
-  inEnable          ALIAS FOR $9;
-  inImgId           ALIAS FOR $10;
-  inParameterIds    ALIAS FOR $11;
-
-BEGIN
-
- /* UPDATE category SET
-    (category_quantity)
-    =
-    coalesce((
-      SELECT category_quantity-1 FROM category
-      WHERE category_id =
-            (
-              SELECT product_category FROM product
-              WHERE product_id = inId AND product_category != inCategoryId
-            )
-    ),0);*/
-
-  UPDATE product SET (
-    product_category,
-    product_title,
-    product_description,
-    product_short_description,
-    product_code,
-    product_price,
-    product_price1,
-    product_enable,
-    product_img,
-    product_parameter,
-    product_updated,
-    search_vector)
-  =
-  (inCategoryId,inTitle, inDescription,inShortDescription,inCode,inPrice,inPrice1,inEnable,inImgId,inParameterIds,now(),
-   (setweight(to_tsvector(inTitle), 'A') || to_tsvector(inDescription)))
-  WHERE product_id = inId;
-
-  /*UPDATE category SET
-    (category_quantity)
-    =
-    coalesce((
-      SELECT category_quantity+1 FROM category
-      WHERE category_id = (
-              SELECT product_category FROM product
-              WHERE product_id = inId AND product_category != inCategoryId
-      ) AND category_id = inCategoryId
-    ),0);*/
-
-  RETURN 1;
-END;
-$_$;
-
-
-ALTER FUNCTION public.product_update(bigint, bigint, character varying, character varying, character varying, character varying, numeric, numeric, boolean, character varying[], bigint[]) OWNER TO postgres;
 
 SET default_tablespace = '';
 
@@ -442,6 +69,57 @@ ALTER TABLE account_account_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE account_account_id_seq OWNED BY account.account_id;
+
+
+--
+-- Name: activation; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE activation (
+    activation_email character varying(256) NOT NULL,
+    activation_nick character varying(256) DEFAULT ''::character varying NOT NULL,
+    activation_password character varying(128) DEFAULT ''::character varying NOT NULL,
+    activation_key character varying(256) DEFAULT ''::character varying NOT NULL,
+    activation_last_ip character varying(64) DEFAULT ''::character varying NOT NULL,
+    activation_created bigint DEFAULT (date_part('epoch'::text, now()))::bigint NOT NULL,
+    activation_phone character varying(64) DEFAULT ''::character varying NOT NULL
+);
+
+
+ALTER TABLE activation OWNER TO postgres;
+
+--
+-- Name: attempt; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE attempt (
+    attempt_id bigint NOT NULL,
+    attempt_ip character varying(64) DEFAULT ''::character varying NOT NULL,
+    attempt_time bigint DEFAULT (date_part('epoch'::text, now()))::bigint NOT NULL
+);
+
+
+ALTER TABLE attempt OWNER TO postgres;
+
+--
+-- Name: attempt_attempt_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE attempt_attempt_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE attempt_attempt_id_seq OWNER TO postgres;
+
+--
+-- Name: attempt_attempt_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE attempt_attempt_id_seq OWNED BY attempt.attempt_id;
 
 
 --
@@ -544,6 +222,23 @@ ALTER TABLE category_category_id_seq OWNER TO postgres;
 
 ALTER SEQUENCE category_category_id_seq OWNED BY category.category_id;
 
+
+--
+-- Name: comment; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE comment (
+    comment_id bigint NOT NULL,
+    comment_account bigint,
+    comment_post bigint,
+    comment_body text,
+    comment_created timestamp without time zone DEFAULT now() NOT NULL,
+    comment_updated timestamp without time zone DEFAULT now() NOT NULL,
+    comment_enable boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE comment OWNER TO postgres;
 
 --
 -- Name: news; Type: TABLE; Schema: public; Owner: postgres
@@ -764,22 +459,46 @@ CREATE TABLE session (
     session_data character(1)[],
     session_user_agent character varying(512) DEFAULT ''::character varying NOT NULL,
     session_ip character varying(128) DEFAULT ''::character varying NOT NULL,
-    session_email character varying(512),
+    session_email character varying(255),
     session_login character varying(128),
     session_token character varying(512),
     session_phone character varying(64),
     session_device character varying(512) DEFAULT ''::character varying NOT NULL,
-    session_role bigint
+    session_role bigint,
+    session_nick character varying(128)
 );
 
 
 ALTER TABLE session OWNER TO postgres;
 
 --
+-- Name: state; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE state (
+    state_id bigint NOT NULL,
+    state_title character varying(255) NOT NULL,
+    state_code character varying(64) DEFAULT ''::character varying NOT NULL,
+    state_img character varying(255)[] DEFAULT NULL::character varying[],
+    state_sort bigint DEFAULT 100 NOT NULL,
+    state_enable boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE state OWNER TO postgres;
+
+--
 -- Name: account account_id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY account ALTER COLUMN account_id SET DEFAULT nextval('account_account_id_seq'::regclass);
+
+
+--
+-- Name: attempt attempt_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY attempt ALTER COLUMN attempt_id SET DEFAULT nextval('attempt_attempt_id_seq'::regclass);
 
 
 --
@@ -835,6 +554,20 @@ ALTER TABLE ONLY role ALTER COLUMN role_id SET DEFAULT nextval('role_role_id_seq
 -- Data for Name: account; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
+INSERT INTO account VALUES (1, 'ilyaran@mail.ru', NULL, NULL, NULL, '2017-12-05 14:47:12.9487', NULL, '2017-12-05 14:47:12.9487', '185d11e1d67caf3d3c469122f8451bb54170df2f90dd537227da194b4b25a2a0', false, '', NULL, '2017-12-05 14:47:12.9487', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT INTO account VALUES (7, 'i-aran@mail.ru', NULL, NULL, NULL, '2017-12-05 17:27:23.706324', '::1', '2017-12-05 17:12:10.33725', '189c75e9c4539429b2f0ff5a80dd8e64923462179a9e131ec6904fc57d8f63b9', false, '', NULL, '2017-12-05 17:12:10.33725', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+
+
+--
+-- Data for Name: activation; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+
+
+--
+-- Data for Name: attempt; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
 
 
 --
@@ -885,6 +618,12 @@ INSERT INTO category VALUES (2, 1, 'Laptops', '<p>News and Views&nbsp;|&nbsp;15 
 </ul>
 ', 100, '2017-10-31 14:36:34.550983', '2017-10-31 14:36:34.550983', 2, '{Asus-VS248H-P-24-LED-LCD-Monitor-16-9-2-ms-P13729418.jpg,1e43d48s-960.jpg}', NULL, true, '');
 INSERT INTO category VALUES (16, NULL, 'WiFi modules cc vv', '', 120, '2017-11-19 18:56:41.084862', '2017-11-19 18:56:41.084862', 0, '{"images (45).jpg","images (3).jpg"}', NULL, true, '');
+
+
+--
+-- Data for Name: comment; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
 
 
 --
@@ -955,20 +694,36 @@ INSERT INTO product VALUES (38, '', 1, NULL, '{"images (44).jpg","images (46).jp
 -- Data for Name: role; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
+INSERT INTO role VALUES (1, NULL, 100, 'boss', true, NULL);
+INSERT INTO role VALUES (2, 1, 100, 'manager', true, NULL);
+INSERT INTO role VALUES (3, 2, 100, 'admin', true, NULL);
 
 
 --
 -- Data for Name: session; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO session VALUES ('b1a66c26-b0bb-4023-98d6-ff7df5a23884_c3e6f89ef1dad8155faab63b7f658b052bd12d4aabbb3b33e6c694d0edcd76db', NULL, 1512396727, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36', '::1', NULL, NULL, NULL, NULL, '', NULL);
+INSERT INTO session VALUES ('919ba1e5-c0d9-4ef3-8c83-bcb0745365bf_af2e8a87521a259b1dbc333ea6a739699ad0520cba11bd1f0b77e7b1174fe47c', 7, 1512476831, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36', '::1', 'i-aran@mail.ru', NULL, NULL, NULL, '', NULL, NULL);
+
+
+--
+-- Data for Name: state; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
 
 
 --
 -- Name: account_account_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('account_account_id_seq', 1, false);
+SELECT pg_catalog.setval('account_account_id_seq', 7, true);
+
+
+--
+-- Name: attempt_attempt_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('attempt_attempt_id_seq', 3, true);
 
 
 --
@@ -1017,7 +772,7 @@ SELECT pg_catalog.setval('product_product_id_seq', 38, true);
 -- Name: role_role_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('role_role_id_seq', 1, false);
+SELECT pg_catalog.setval('role_role_id_seq', 3, true);
 
 
 --
@@ -1026,6 +781,22 @@ SELECT pg_catalog.setval('role_role_id_seq', 1, false);
 
 ALTER TABLE ONLY account
     ADD CONSTRAINT account_pkey PRIMARY KEY (account_id);
+
+
+--
+-- Name: activation activation_activation_email_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY activation
+    ADD CONSTRAINT activation_activation_email_pk PRIMARY KEY (activation_email);
+
+
+--
+-- Name: attempt attempt_attempt_id_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY attempt
+    ADD CONSTRAINT attempt_attempt_id_pk PRIMARY KEY (attempt_id);
 
 
 --
@@ -1125,6 +896,20 @@ CREATE UNIQUE INDEX account_account_phone_uindex ON account USING btree (account
 --
 
 CREATE UNIQUE INDEX account_account_token_uindex ON account USING btree (account_token);
+
+
+--
+-- Name: activation_activation_email_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX activation_activation_email_uindex ON activation USING btree (activation_email);
+
+
+--
+-- Name: attempt_attempt_id_uindex; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX attempt_attempt_id_uindex ON attempt USING btree (attempt_id);
 
 
 --
