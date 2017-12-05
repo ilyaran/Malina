@@ -1,7 +1,4 @@
 /**
- *
- *
- *
  * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
@@ -9,7 +6,8 @@
  * @link
  * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
  * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
- */ package lang
+ */
+package lang
 
 import (
 	"strconv"
@@ -17,16 +15,16 @@ import (
 	"github.com/ilyaran/Malina/app"
 )
 
-var Lang string = "ru"
+var Lang string = "en"
 
 func T(key string) string {
 
 	if Lang!=""{
-		if v,ok:=Dict[Lang][key];ok{
+		if v,ok := Dict[Lang][key]; ok {
 			return v
 		}
 	}else {
-		if v,ok:=Dict["en"][key];ok{
+		if v,ok := Dict["en"][key]; ok {
 			return v
 		}
 	}
@@ -37,44 +35,19 @@ func T(key string) string {
 }
 
 var Dict = map[string]map[string]string{
-	"ru":{
-		`sign in failed your password is an incorrect`:`Вход не удался, пароль и email не совпадают`,
-		`invalid`:`не корректный`,
-		`validation required`	:`Поле %s обязательно требуется.`,
-		`validation min length`	: `Поле %s должно содержать не менее %d символов.`,
-		`validation max length`	: `Поле %s должно содержать не более %d символов.`,
-		`auth exceed max attempts`:"Attempts exceed max attempts in config. No more than "+ strconv.FormatInt(app.Login_attempts,10)+ " times per 24 hours",
-		`auth_confirm_pass_valid`:"Поле повторить пароль и поле пароль должны совпадать.",
-
-		"exists allready":"уже существует",
-		`auth_logout_first`:"Вы должны сперва выйти. Вы уже залогинены.",
-		`server error`: `ошибка сервера`,
-		`wrong_recaptcha`:"Каптча не правильная. Может быть вы робот.",
-		`not found`:`не найдено`,
-		`auth_email_not_exist` : "Email не существует",
-		"required":"обязательное поле для заполнения",
-		`auth_login_allready`:"Вы уже залогинены.",
-
-		`auth first`:"Вы должны сперва авторизоваться, прежде чем пытаться сбросить пароль.",
-		"old password":"Старый пароль.",
-		"new password":"Новый пароль.",
-		"confirm new password":"Подтвердить новый пароль.",
-		"reset password" : "Новый пароль",
-		"send":"Отправить",
-		"password success changed":"Пароль успешно изменен.",
-		"incorrect password":"Не корректный пароль.",
-		`auth_activation_incorrect_code`:"Код активации неправильный или истек срок годности кода. Пожалуйста проверьте email снова.",
-
-
-
+	"en":{
+		`not find`:`not find any item`,
 
 		`validation text field`	:  `The %s field must contain %s`,
 
 		`validation integer`	:  `The %s field must contain an integer.`,
 		`validation email`	:"The Email field must contain all valid email addresses.",
-		`validation phone`	:"The PhoneCode field must contain all valid phone numbers.",
+		`validation phone`	:"The Phone field must contain all valid phone numbers.",
+		`validation required`	:`The %s field is required.`,
+		`validation min length`	: `The %s field must be at least %d characters in length.`,
+		`validation max length`	: `The %s field cannot exceed %d characters in length.`,
 
-
+		`server error`: `Server Error`,
 		"no post data":"No Post Data",
 		"not auth":"You must login",
 		"no post request":"It is not a Post Method Request",
@@ -90,16 +63,17 @@ var Dict = map[string]map[string]string{
 		`upload_one_image_title`:       `Images (gif,jpg,png) pictures, size no greater than: ` + fmt.Sprintf("%d", app.Image_max_size) + ` bytes each, max dimensions: ` + fmt.Sprintf("%d x %d", app.Image_max_width, app.Image_max_height) + ` pixels.`,
 		`upload no image`:            `The file you submitted is not an image.`,
 
-
+		`wrong_recaptcha`:"The Captcha field is wrong. May be you are a robot.",
 
 		`auth_login_email_or_password_incorrect`:"Email or password was incorrect.",
-
+		`auth_login_allready`:"You had been allready sign in.",
 
 		//login attempts exceed max attempts in config
+		`auth exceed max attempts`:"Attempts exceed max attempts in config. No more than "+ strconv.FormatInt(app.Login_attempts,10)+ " times per 24 hours",
 
-
+		`auth_email_not_exist`:"Email does not exist",
 		`auth_nick_not_exist`:"Nick does not exist",
-		`auth_phone_not_exist`:"PhoneCode does not exist",
+		`auth_phone_not_exist`:"Phone does not exist",
 		`auth_nick_or_email_not_exist`:"Nick or email address not exist.",
 		`auth nick or email or phone not exist`:"Nick or email address or phone number not exist.",
 		`auth_nick_or_email_required`:"Nick or email is required.",
@@ -108,81 +82,85 @@ var Dict = map[string]map[string]string{
 		`auth_nick_or_email_valid`:"The Nick or Email field must contain valid nick name or email.",
 
 		`auth_reg_disabled`:"Registration has been disabled.",
-		`auth email or nick or phone and password are not exist`:"Email or Nick or PhoneCode and Password are not exist.",
-
-
+		`auth email or nick or phone and password are not exist`:"Email or Nick or Phone and Password are not exist.",
+		`auth_logout_first`:"You have to logout first, before registering.",
+		`auth_reset_first`:"You have to login first, before reeset password.",
 		`auth_email_exist_allready`:"Email allready exists choose other email",
 		`auth_nick_exist_allready`:"Nick allready exists choose other nick",
-		"auth phone exist allready":"PhoneCode number allready exists choose other phone number",
+		"auth phone exist allready":"Phone number allready exists choose other phone number",
 		`auth email or nick or phone exist allready`:"Email or nick or phone allready exists choose other email or nick or phone",
 		"auth email or phone exist allready":"Email or phone allready exists choose other email or phone",
 
 		`auth_email_sent_allready`:"There is already activation code waiting to be activated",
-
+		`auth_confirm_pass_valid`:"The Confirm Password field must be same with password field.",
 		`auth_activation_success`:"Your account have been successfully activated.",//checked
+		`auth_forgot_success`:"The new password was sent to your email address.",//checked
 		`auth_activation_allready_activated`:"Your account had been allready activated.",
 		`auth_i_agree`:"You must agree before register.",
 		`auth_success_reg_check`:"You have successfully registered. Check your email address to activate your account.",
 		`auth_success_reg`:"You have successfully registered.",
 
-
+		`auth_activation_incorrect_code`:"The activation code you entered was incorrect. Please check your email again.",
 
 		`auth_activation_notyet`:"Your account hasn't been activated yet. Please check your email.",
 		`auth_activation_sent_allready`:"Your request to change password is already sent. Please check your email.",
 		`auth_not_activated`:`Your account hasn't been activated yet. Please check your email.`,
 
 		//******************** Email subject
-		`auth_account_subject`:         `данные аккаунта`,
-		`auth_activate_subject`:        `активация`,
-		`auth_forgot_password_subject`: `запрос нового пароля`,
+		`auth_account_subject`:         `account details`,
+		`auth_activate_subject`:        `activation`,
+		`auth_forgot_password_subject`: `new password request`,
 
 		`auth_activate_content`:`
-%v !
+	<html><body>
+Welcome to %v
 
-Для активации Вашего аккаунта, вы должны пройти по следующей ссылке:
-%v
+To activate your account, you must follow the activation link below:
+%s
 
-Пожалуйста активируйте аккаунт в течение %d часов, иначе исчетет отведенный срок для активации.
+Please activate your account within %d hours, otherwise your registration will become invalid and you will have to register again.
 
-Ваш имейл и пароль:
+You can use either you username or email address to login.
+Your login details are as follows:
 
-Email: %v
-Password: %v
+Email: %s
+Password: %s
 
-Желаем всего наилучшего,
- команда %v`,
+We hope that you enjoy your stay with us :)
+
+Regards,
+The %s Team	</body></html>`,
 		//******************************
 		`auth_forgot_password_content`:`
-%v,
+Welcome to %v
 
-Вы запросили изменение вашего пароля, потому что вы забыли пароль.
-
-Email: %v
-Password: %v
-
-Если у вас возникли проблемы, тогда свяжитесь по %v.
-
-Желаем всего наилучшего,
- команда %v`,
-
-		//******************************
-		`auth_account_content`: `
-%v,
-
-Спасибо за регистрацию. Ваш аккаунт был успешно создан.
-
-Вы можете залогиниться по имейлу и паролю:
+You have requested your password to be changed, because you forgot the password.
 
 Email: %s
 Password: %v
 
-Залогинившись Вы можете попасть в личный кабинет по ссылке:
-%v
+If you have any more problems with gaining access to your account please contact %v.
 
-Мы надеемся на что Вы проведете хорошее время с нами.
+Regards,
+The %v Team`,
 
-Желаем всего наилучшего,
- команда %v`,
+		//******************************
+		`auth_account_content`:`
+Welcome to %v
+
+Thank you for registering. Your account was successfully created.
+
+You can login with either your username or email address:
+
+Email: %s
+Password: %v
+
+You can try logging in now by going to %v
+
+We hope that you enjoy your stay with us.
+
+Regards,
+The %v Team`,
 	},
 
 

@@ -119,7 +119,7 @@ func SetConfig(os string)error{
 	Url_auth_banned                 = ""
 
 	Url_auth_activation =  Base_url+"auth/activation/"
-	Url_cabinet_profile =  Base_url+"cabinet/profile/list/"
+	Url_cabinet_profile =  Base_url+"cabinet/profile/"
 
 	AccountSelectSqlFieldsList = []string{
 		/*0*/ "COALESCE(account.account_id,0)",
@@ -195,6 +195,7 @@ func SetFilemanagerConf(os string)  {
 }
 
 
+
 var Domain_name =  `example.com`
 var Site_name =  `Malina`
 
@@ -219,8 +220,8 @@ var GenereatedPincodeLen = 4
 var Cookie_name =  `malina`
 var Cookie_expiration  = 3600
 
-var Admin_email  = ""
-var Admin_email_pass = ""
+var Admin_email  = "johnxiaran@gmail.com"
+var Admin_email_pass = "MuromSvetXia116692"
 
 var Admin_role_id int64 = 0
 

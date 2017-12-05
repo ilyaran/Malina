@@ -55,7 +55,7 @@ func(s *Upload) Img(malina *berry.Malina,keyName string, w http.ResponseWriter, 
 		malina.Result["error"] = lang.T(`parse form error`)
 		return "",false
 	}
-	filename, prepareError, _ := s.PrepareToUploadPublicAjax(0, r.FormValue(keyName))
+	filename, prepareError, _ := s.PrepareToUploadPublicAjax(malina,0, r.FormValue(keyName))
 	if !prepareError {
 		malina.Status = 500
 		malina.Result["error"] = "error of prepare file: " + filename
@@ -67,7 +67,7 @@ func(s *Upload) Img(malina *berry.Malina,keyName string, w http.ResponseWriter, 
 		malina.Status = -20
 		return "",true
 	}
-	filenameResult, saveResult, _ := s.SaveUploadedFiles(r.FormValue(keyName), filename, 0, app.Root_path+app.Path_assets_uploads)
+	filenameResult, saveResult, _ := s.SaveUploadedFiles(malina,r.FormValue(keyName), filename, 0, app.Root_path+app.Path_assets_uploads)
 	if !saveResult {
 		malina.Status = 500
 		malina.Result["error"] = "save error with file: " + filenameResult
@@ -77,7 +77,7 @@ func(s *Upload) Img(malina *berry.Malina,keyName string, w http.ResponseWriter, 
 	return  filenameResult,true
 }
 
-func (s *Upload)PrepareToUploadPublicAjax(indexNumberOfImage int,img string) (string, bool, int) {
+func (s *Upload)PrepareToUploadPublicAjax(malina *berry.Malina,indexNumberOfImage int,img string) (string, bool, int) {
 	if img == "null"{
 		return "null", true, indexNumberOfImage // it means set image to null
 	}
@@ -112,7 +112,7 @@ func (s *Upload)PrepareToUploadPublicAjax(indexNumberOfImage int,img string) (st
 	return fileName, true, indexNumberOfImage
 }
 
-func (s *Upload)SaveUploadedFiles(img,fileName string,indexNumberOfImage int, path string) (string, bool, int) {
+func (s *Upload)SaveUploadedFiles(malina *berry.Malina,img,fileName string,indexNumberOfImage int, path string) (string, bool, int) {
 	if strings.IndexByte(img,',') < 0{
 		return lang.T("upload error base64 decoding"), false, indexNumberOfImage
 	}

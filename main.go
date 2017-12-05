@@ -40,8 +40,8 @@ func main() {
 	router.HandleFunc("/public/{controller}/{action}/", controllers.PublicDepartment).Methods("GET")
 	router.HandleFunc("/public/{controller}/{action}/", controllers.PublicDepartment).Methods("POST")
 
-	router.HandleFunc("/cabinet/{controller}/{action}/", controllers.CabinetDepartment).Methods("GET")
-	router.HandleFunc("/cabinet/{controller}/{action}/", controllers.CabinetDepartment).Methods("POST")
+	router.HandleFunc("/cabinet/{action}/", controllers.CabinetDepartment).Methods("GET")
+	router.HandleFunc("/cabinet/{action}/", controllers.CabinetDepartment).Methods("POST")
 
 	router.HandleFunc("/auth/{action}/", controllers.AuthDepartment).Methods("POST","GET")
 

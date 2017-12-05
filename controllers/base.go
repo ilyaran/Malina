@@ -48,7 +48,7 @@ func HomeDepartment (w http.ResponseWriter, r *http.Request){
 	malina := getNewMalina(w,r)
 	malina.ControllerName = mux.Vars(r)["controller"]
 	malina.Department = "home"
-	//if malina.CurrentAccount!=nil && malina.CurrentAccount.Role == app.Admin_role_id {
+	if malina.CurrentAccount!=nil && malina.CurrentAccount.Role == app.Admin_role_id {
 		switch malina.ControllerName {
 			case "product"      : ProductController.Index(malina,w,r)
 			case "category"     : CategoryController.Index(malina,w,r)
@@ -61,32 +61,30 @@ func HomeDepartment (w http.ResponseWriter, r *http.Request){
 			case "activation"   :
 			default:HomeController.Index(w,r)
 		}
-	//}else{
-		//http.Redirect(w,r, "/", 301)
-		//401 non admin unauth
-		//malina.Status = http.StatusUnauthorized
-		//malina.Result["error"] = lang.T("unauth")
-	//}
+	}else{
+		http.Redirect(w,r, "/", 301)
+	}
 }
 func PublicDepartment (w http.ResponseWriter, r *http.Request){
 	malina := getNewMalina(w,r)
 	malina.ControllerName = mux.Vars(r)["controller"]
 	malina.Department = "public"
 	switch malina.ControllerName {
-	case "product"	:	ProductController.Index(malina,w,r)
-	case "category"	:	CategoryController.Index(malina,w,r)
-	case "parameter":	ParameterController.Index(malina,w,r)
-	case "cart"		:
-	default			: 	WelcomeController.Index(malina,w,r)
+	case "product"		:	ProductController.Index(malina,w,r)
+	case "category"		:	CategoryController.Index(malina,w,r)
+	case "parameter"	:	ParameterController.Index(malina,w,r)
+	case "cart"			:
+	default				: 	WelcomeController.Index(malina,w,r)
 	}
 }
 func CabinetDepartment (w http.ResponseWriter, r *http.Request){
 	malina := getNewMalina(w,r)
-	malina.ControllerName = mux.Vars(r)["controller"]
-	if malina.CurrentAccount!=nil{
-		malina.Department = "cabinet"
-		switch malina.ControllerName {
+	malina.Department = "cabinet"
+	malina.Action = mux.Vars(r)["action"]
+	if malina.CurrentAccount != nil {
+		switch malina.Action {
 		case "cart"		:
+		default			:	CabinetController.Index(malina,w,r)
 		}
 	}else {
 		http.Redirect(w,r, "/", 301)

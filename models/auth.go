@@ -80,7 +80,7 @@ func (s *authModel)GetActivation(activation_key string) *entity.Account{
 		return nil
 	}
 	go s.RemoveFromActivateTable(user_email)
-	return &entity.Account{Email:user_email,Password:user_password}
+	return &entity.Account{Email:user_email,Newpass:user_password}
 }
 
 

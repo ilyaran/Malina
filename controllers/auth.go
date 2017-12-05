@@ -1,7 +1,5 @@
 /**
  *
- *
- *
  * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
@@ -9,7 +7,8 @@
  * @link
  * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
  * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
- */ package controllers
+ */
+package controllers
 
 import (
 	"net/http"
@@ -73,7 +72,7 @@ func(s *Auth)Login(malina *berry.Malina,w http.ResponseWriter, r *http.Request){
 							dao.AuthDao.Model.Del(malina.SessionId)
 							dao.AuthDao.SetSession(accountObj,r,w)
 
-							http.Redirect(w, r, app.Url_cabinet, 301 )
+							http.Redirect(w, r, app.Url_cabinet_profile, 301 )
 							return
 						}
 					}
@@ -89,8 +88,8 @@ func(s *Auth)Login(malina *berry.Malina,w http.ResponseWriter, r *http.Request){
 		for _,v:=range malina.Result {
 			message += `<p>`+v.(string)+`</p>`
 		}
-		//s.view.AlertNotice(malina,message,w)
-		//return
+		s.view.Index(malina,message,w)
+		return
 	}
 	s.view.Login(malina,w,r)
 }
@@ -126,18 +125,19 @@ func(s *Auth)Register(malina *berry.Malina,w http.ResponseWriter, r *http.Reques
 			if models.AuthModel.AddActivation(email, pass, activation_key, dao.AuthDao.GetIP(r)) {
 				var emailContent string = fmt.Sprintf(lang.T("auth_activate_content"),
 					app.Site_name,
-					app.Url_auth_activation+`?activation_key=`+activation_key+` Завершите регистрацию перейдя по этой ссылке.`,
+					app.Url_auth_activation+`?activation_key=`+activation_key,
 					app.Email_activation_expire/int64(3600),
 					email,
 					pass,
 					app.Site_name,
 				)
-				//fmt.Println(app.Base_url + app.Url_auth_activation + "?activation_key=" + activation_key)
+				fmt.Println(app.Url_auth_activation + "?activation_key=" + activation_key)
 				go dao.AuthDao.SendEmail(app.Site_name+" "+lang.T("auth_activate_subject"), email, emailContent)
 
 				malina.Status = 0
 				message = lang.T("auth_success_reg_check")
-				s.view.RegistrationResult(malina,email,w)
+				//s.view.RegistrationResult(malina,email,w)
+				s.view.Index(malina,message,w)
 				return
 			} else {
 				malina.Status = 500
@@ -146,13 +146,13 @@ func(s *Auth)Register(malina *berry.Malina,w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	if malina.Status > 0 {
-		for _,v:=range malina.Result {
-			message += `<p>`+v.(string)+`</p>`
-		}
+	//if malina.Status > 0 {
+		//for _,v:=range malina.Result {
+		//	message += `<p>`+v.(string)+`</p>`
+		//}
 		//s.view.AlertNotice(malina,message,w)
 		//return
-	}
+	//}
 
 	s.view.Register(malina,w,r)
 }
@@ -166,15 +166,14 @@ func(s *Auth)Activation(malina *berry.Malina,w http.ResponseWriter, r *http.Requ
 		match, err := regexp.MatchString("^[a-zA-Z0-9_]{30,255}$", activation_key)
 		if err == nil && match {
 			account := models.AuthModel.GetActivation(activation_key)
+			//fmt.Println(account)
 			if account != nil {
 				account.Password = dao.AuthDao.Cryptcode(account.Newpass)
-				last_user_id := models.AuthModel.AddAccount(`
-				(account_email,account_password)VALUES($1,$2)`, account.Email, account.Password)
+				//fmt.Println(account)
+				last_user_id := models.AuthModel.AddAccount(`(account_email,account_password)VALUES($1,$2)`, account.Email, account.Password)
 				if last_user_id > 0 {
 					account.SetId(last_user_id)
-
 					dao.AuthDao.Model.Del(malina.SessionId)
-
 					dao.AuthDao.SetSession(account,r,w)
 					var emailContent string = fmt.Sprintf(
 						lang.T("auth_account_content"),
@@ -185,13 +184,9 @@ func(s *Auth)Activation(malina *berry.Malina,w http.ResponseWriter, r *http.Requ
 						app.Site_name,
 					)
 					go dao.AuthDao.SendEmail(app.Site_name+" "+lang.T("auth_account_subject"), account.Email, emailContent)
-
 					malina.CurrentAccount = account
-
 					message = lang.T("auth_activation_success") + `<br><a href="` + app.Base_url + `">` + lang.T("home") + `</a>`
-					s.view.ActivationSuccess(malina,w)
-
-					//http.Redirect(w, r, "/cabinet/profile/", 307)
+					s.view.Index(malina,message,w)
 					return
 				}
 			} else {
@@ -202,7 +197,7 @@ func(s *Auth)Activation(malina *berry.Malina,w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	if malina.Status>0{
+	if malina.Status > 0 {
 		for _,v:=range malina.Result {
 			message += `<p>`+v.(string)+`</p>`
 		}

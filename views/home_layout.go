@@ -1,7 +1,4 @@
 /**
- *
- *
- *
  * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
@@ -9,7 +6,8 @@
  * @link
  * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
  * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
- */ package views
+ */
+package views
 
 import (
 	"github.com/ilyaran/Malina/app"
@@ -20,12 +18,9 @@ import (
 	"strings"
 )
 
-
 func HomeLayoutViewInit(){
 	HomeLayoutView =&HomeLayout{}
 	HomeLayoutView.SetLayout()
-
-
 }
 var HomeLayoutView *HomeLayout
 type HomeLayout struct {

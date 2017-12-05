@@ -1,7 +1,4 @@
 /**
- *
- *
- *
  * @author		John Aran (Ilyas Aranzhanovich Toxanbayev)
  * @version		1.0.0
  * @based on
@@ -9,8 +6,9 @@
  * @link
  * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
  * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
- */ package publicView
+ */
 
+package publicView
 
 import (
 	"net/http"
@@ -22,7 +20,6 @@ import (
 	"github.com/ilyaran/Malina/lang"
 )
 
-
 func PublicLayoutViewInit(){
 	PublicLayoutView =&PublicLayout{}
 	PublicLayoutView.SetLayout()
@@ -33,6 +30,7 @@ type PublicLayout struct {
 	LayoutMain string
 	Per_page_select string
 }
+
 func(s *PublicLayout) response(malina *berry.Malina, w http.ResponseWriter){
 	var navAuthBar string
 	if malina.CurrentAccount!=nil{
@@ -46,6 +44,7 @@ func(s *PublicLayout) response(malina *berry.Malina, w http.ResponseWriter){
 			navAuthBar +=malina.CurrentAccount.Email
 		}
 		navAuthBar +=`</a>
+		<a href="auth/logout/">Logout</a>
 		</div>`
 	}else {
 		navAuthBar = `
@@ -66,6 +65,7 @@ func(s *PublicLayout) response(malina *berry.Malina, w http.ResponseWriter){
 	t, _ = t.Parse(PublicLayoutView.LayoutMain)
 	t.Execute(w, malina)
 }
+
 func (s *PublicLayout) SetPer_page_select()string{
 	var out string
 	var step = (app.Per_page_max -1-app.Per_page)/app.Per_page_select_options_widget_num
@@ -77,16 +77,6 @@ func (s *PublicLayout) SetPer_page_select()string{
 	s.Per_page_select = lang.T("per page") + `<select name="per_page" id="per_page" >`+out+`</select>`
 	return lang.T("per page") + `<select name="per_page" id="per_page" >`+out+`</select>`
 }
-
-func (s *PublicLayout) navbar(malina *berry.Malina) string {
-	var out string
-	out+=`
-
-
-	`
-	return out
-}
-
 
 func (s *PublicLayout)SetLayout(){
 	s.SetPer_page_select()
@@ -119,7 +109,6 @@ License URL: http://creativecommons.org/licenses/by/3.0/
 <body>
 
 	<input type="hidden" value="6000" id="MAX_PRICE"/>
-
 
 	<!--header-->
 	<div class="header">

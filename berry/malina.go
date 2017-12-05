@@ -28,7 +28,7 @@ type IController interface {
 
 type Malina struct {
 	ChannelBool				chan bool
-
+	Lang 				string
 	CurrentAccount 		*entity.Account
 	SessionId			string
 	Status 				int64

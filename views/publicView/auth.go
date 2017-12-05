@@ -47,6 +47,8 @@ func (s *Auth)Login(malina *berry.Malina,w http.ResponseWriter, r *http.Request)
 		<div class=" login-right">
 			<h3>REGISTERED CUSTOMERS</h3>
 			<p>If you have an account with us, please log in.</p>
+	<span class="error">`;if v,ok:= malina.Result["error"]; ok {content += v.(string)};content += `</span>
+
 			<form method="POST" >
 				<div>
 					<span>Email Address<label>*</label></span>
@@ -58,7 +60,7 @@ func (s *Auth)Login(malina *berry.Malina,w http.ResponseWriter, r *http.Request)
 					<input type="text" name="password" required/>
 					<span class="error">`;if v,ok:= malina.Result["password"]; ok {content += v.(string)};content += `</span>
 				</div>
-				<a class="forgot" href="#">Forgot Your Password?</a>
+				<a class="forgot" href="auth/forgot">Forgot Your Password?</a>
 				<input type="submit" value="Login">
 			</form>
 		</div>
@@ -83,6 +85,7 @@ func (s *Auth)Register(malina *berry.Malina,w http.ResponseWriter, r *http.Reque
 		  	  <form method="POST" >
 				 <div class="  register-top-grid">
 					<h3>PERSONAL INFORMATION</h3>
+					<span class="error">`;if v,ok:= malina.Result["error"]; ok {content += v.(string)};content += `</span>
 					<div class="mation">
 						<span>First Name<label>*</label></span>
 						<input value="`+r.FormValue("first_name")+`" name="first_name" type="text" required/>
