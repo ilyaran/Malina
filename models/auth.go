@@ -37,24 +37,30 @@ func (this *authModel)CheckDetails(param, value string)int64{
 	}
 	return all
 }
-func (this *authModel) AddActivation(email,pass,activation_key, ip_address string) bool {
+func (this *authModel) AddActivation(email,pass,ip_address string) string {
+	var activation_key string
 	query := `
 		INSERT INTO activation
 		(activation_email,activation_password,activation_key,activation_last_ip)
 		VALUES
-		($1,$2,$3,$4)
+		($1,$2,uuid_generate_v4(),$3)
 		ON CONFLICT (activation_email) DO UPDATE
         SET activation_password = $2,
-        activation_key = $3,
-        activation_last_ip = $4,
+        activation_key = uuid_generate_v4(),
+        activation_last_ip = $3,
         activation_created = date_part('epoch',CURRENT_TIMESTAMP)::bigint
 
-		RETURNING activation_created`
-	//fmt.Println(query)
-	if CrudGeneral.Insert(query,  email,pass,activation_key,ip_address) > 0 {
-		return true
+		RETURNING activation_key`
+	err:=CrudGeneral.DB.QueryRow(query,email,pass,ip_address).Scan(&activation_key)
+	if err == sql.ErrNoRows {
+		panic(err)
+		return ""
 	}
-	return false
+	if err != nil {
+		panic(err)
+		return ""
+	}
+	return activation_key
 }
 
 func (s *authModel)GetActivation(activation_key string) *entity.Account{

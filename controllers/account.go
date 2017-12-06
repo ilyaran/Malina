@@ -68,14 +68,14 @@ func AccountControllerInit()string{
 	AccountController.base.searchSqlTemplate=` account_nick LIKE '%~%'
 												OR account_email LIKE '%~%'
 												OR account_first_name LIKE '%~%'
-												OR account_skype LIKE '%~%'
 												OR account_last_name LIKE '%~%'																							OR account_email LIKE '%~%'
-												OR account_trade LIKE '%~%'
-												OR account_steam LIKE '%~%'
 												OR account_phone LIKE '%~%' `
 
 	AccountController.base.inlistSqlFields = map[string]byte{
 		"account_first_name"     :'s',
+		"account_last_name"     :'s',
+		"account_nick"     :'s',
+		"account_email"     :'s',
 		"account_ban"    :'b',
 	}
 

@@ -122,7 +122,8 @@ func(s *Auth)Register(malina *berry.Malina,w http.ResponseWriter, r *http.Reques
 		if malina.Status == 0 {
 
 			var activation_key = dao.AuthDao.Cryptcode(fmt.Sprintf(fmt.Sprintf("%v%v%v", time.Now().UTC().UnixNano(), app.Crypt_salt, dao.AuthDao.GetIP(r))))
-			if models.AuthModel.AddActivation(email, pass, activation_key, dao.AuthDao.GetIP(r)) {
+			activation_key = models.AuthModel.AddActivation(email, pass, dao.AuthDao.GetIP(r))
+			if activation_key != "" {
 				var emailContent string = fmt.Sprintf(lang.T("auth_activate_content"),
 					app.Site_name,
 					app.Url_auth_activation+`?activation_key=`+activation_key,
@@ -163,7 +164,7 @@ func(s *Auth)Activation(malina *berry.Malina,w http.ResponseWriter, r *http.Requ
 		message = lang.T("auth_logout_first")
 	}else {
 		activation_key := r.URL.Query().Get("activation_key")
-		match, err := regexp.MatchString("^[a-zA-Z0-9_]{30,255}$", activation_key)
+		match, err := regexp.MatchString(`^[a-zA-Z0-9_\-]{20,255}$`, activation_key)
 		if err == nil && match {
 			account := models.AuthModel.GetActivation(activation_key)
 			//fmt.Println(account)
@@ -193,7 +194,7 @@ func(s *Auth)Activation(malina *berry.Malina,w http.ResponseWriter, r *http.Requ
 				message = lang.T("auth_activation_incorrect_code")
 			}
 		}else {
-			message = "Код активации "+lang.T("invalid")
+			message = "activation key is "+lang.T("invalid")
 		}
 	}
 
