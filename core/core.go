@@ -9,7 +9,8 @@
  * @link
  * @github      	https://github.com/ilyaran/github.com/ilyaran/Malina
  * @license		MIT License Copyright (c) 2017 John Aran (Ilyas Toxanbayev)
- */ package core
+ */
+package core
 
 import (
 	"runtime"
