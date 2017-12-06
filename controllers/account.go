@@ -108,9 +108,7 @@ func(s *Account)Index(malina *berry.Malina,department, device string, w http.Res
 	malina.TableSql = s.base.dbtable
 	s.base.index(malina,w,r,"")
 }
-
 func(s *Account)GetList(malina *berry.Malina, w http.ResponseWriter, r *http.Request, condition string){
-
 
 	if malina.Status > 0 {
 		return
@@ -152,14 +150,12 @@ func(s *Account)GetList(malina *berry.Malina, w http.ResponseWriter, r *http.Req
 				s.view.Index(malina,w)
 			}
 		}
-
 	// if the user agent is a mobile or another device
 	}else {
 		out, _ := json.Marshal(malina.List)
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		w.Write(out)
 	}
-
 }
 
 
