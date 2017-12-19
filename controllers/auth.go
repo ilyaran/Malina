@@ -13,7 +13,6 @@ package controllers
 import (
 	"net/http"
 	"fmt"
-	"time"
 	"regexp"
 	"github.com/ilyaran/Malina/lang"
 	"github.com/ilyaran/Malina/views/publicView"
