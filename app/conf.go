@@ -220,8 +220,8 @@ var GenereatedPincodeLen = 4
 var Cookie_name =  `malina`
 var Cookie_expiration  = 3600
 
-var Admin_email  = "johnxiaran@gmail.com"
-var Admin_email_pass = "MuromSvetXia116692"
+var Admin_email  = "<admin email>"
+var Admin_email_pass = "<password>"
 
 var Admin_role_id int64 = 0
 
